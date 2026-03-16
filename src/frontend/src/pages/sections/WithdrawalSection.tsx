@@ -100,6 +100,24 @@ export default function WithdrawalSection() {
       if (isAdmin) {
         LocalStore.deductAdminCommission(amt);
       }
+      // Save to localStorage for persistence
+      const newWithdrawal = {
+        id: `wd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        amount: amt,
+        method,
+        methodDetails,
+        status: "approved",
+        createdAt: Date.now(),
+        utrNumber: `${Date.now().toString().slice(0, 12)}`,
+      };
+      const existing = JSON.parse(
+        localStorage.getItem("kuber_withdrawal_history") ?? "[]",
+      );
+      existing.unshift(newWithdrawal);
+      localStorage.setItem(
+        "kuber_withdrawal_history",
+        JSON.stringify(existing.slice(0, 200)),
+      );
       toast.success("Withdrawal request submitted successfully!");
       setAmount("");
       refresh();

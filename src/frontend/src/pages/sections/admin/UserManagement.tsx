@@ -222,7 +222,10 @@ export default function UserManagement() {
                         {i + 1}
                       </td>
                       <td className="px-3 py-3">
-                        <span className="text-xs text-white font-medium break-all">
+                        <span
+                          className="text-xs text-white font-medium break-all max-w-[140px] block truncate"
+                          title={user.email}
+                        >
                           {user.email}
                         </span>
                       </td>

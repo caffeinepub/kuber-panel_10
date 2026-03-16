@@ -186,7 +186,19 @@ export default function WithdrawalHistory() {
   const [selected, setSelected] = useState<WithdrawalData | null>(null);
 
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const recent = withdrawals
+  const localWithdrawals: any[] = JSON.parse(
+    localStorage.getItem("kuber_withdrawal_history") ?? "[]",
+  );
+  const allWithdrawals = [...withdrawals];
+  for (const lw of localWithdrawals) {
+    if (!allWithdrawals.find((w) => w.id === lw.id)) {
+      allWithdrawals.push({
+        ...lw,
+        createdAt: BigInt(lw.createdAt) * BigInt(1_000_000),
+      });
+    }
+  }
+  const recent = allWithdrawals
     .filter((w) => Number(w.createdAt) / 1_000_000 > thirtyDaysAgo)
     .sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
 
@@ -252,76 +264,88 @@ export default function WithdrawalHistory() {
         >
           <span className="text-sm font-bold gold-text">LAST 30 DAYS</span>
         </div>
-        <table className="w-full" data-ocid="withdrawal_history.table">
-          <thead>
-            <tr style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}>
-              {["Date", "Time", "Amount", "Method", "UTR Number", "Status"].map(
-                (h) => (
+        <div className="overflow-x-auto">
+          <table
+            className="w-full min-w-[600px]"
+            data-ocid="withdrawal_history.table"
+          >
+            <thead>
+              <tr
+                style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
+              >
+                {[
+                  "Date",
+                  "Time",
+                  "Amount",
+                  "Method",
+                  "UTR Number",
+                  "Status",
+                ].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
                   >
                     {h}
                   </th>
-                ),
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {recent.length === 0 && (
+                <tr data-ocid="withdrawal_history.empty_state">
+                  <td colSpan={6} className="text-center py-10 text-gray-600">
+                    No withdrawal history
+                  </td>
+                </tr>
               )}
-            </tr>
-          </thead>
-          <tbody>
-            {recent.length === 0 && (
-              <tr data-ocid="withdrawal_history.empty_state">
-                <td colSpan={6} className="text-center py-10 text-gray-600">
-                  No withdrawal history
-                </td>
-              </tr>
-            )}
-            {recent.map((w, i) => (
-              <tr
-                key={w.id}
-                data-ocid={`withdrawal_history.item.${i + 1}`}
-                className="table-row-hover cursor-pointer"
-                style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)" }}
-                onClick={() => setSelected(w)}
-                onKeyDown={(e) => e.key === "Enter" && setSelected(w)}
-                tabIndex={0}
-              >
-                <td className="px-4 py-3 text-xs text-gray-300">
-                  {fmtDate(w.createdAt)}
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-400">
-                  {fmtTime(w.createdAt)}
-                </td>
-                <td className="px-4 py-3 text-sm font-bold gold-text">
-                  ₹{w.amount.toLocaleString("en-IN")}
-                </td>
-                <td className="px-4 py-3 text-xs text-white uppercase">
-                  {w.method}
-                </td>
-                <td className="px-4 py-3 text-xs font-mono text-gray-400">
-                  {w.utrNumber ||
-                    `UTR${w.id.replace(/-/g, "").slice(0, 10).toUpperCase()}`}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                      w.status === "approved"
-                        ? "text-green-400"
-                        : "text-yellow-400"
-                    }`}
-                    style={{
-                      background:
+              {recent.map((w, i) => (
+                <tr
+                  key={w.id}
+                  data-ocid={`withdrawal_history.item.${i + 1}`}
+                  className="table-row-hover cursor-pointer"
+                  style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)" }}
+                  onClick={() => setSelected(w)}
+                  onKeyDown={(e) => e.key === "Enter" && setSelected(w)}
+                  tabIndex={0}
+                >
+                  <td className="px-4 py-3 text-xs text-gray-300 whitespace-nowrap">
+                    {fmtDate(w.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                    {fmtTime(w.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold gold-text whitespace-nowrap">
+                    ₹{w.amount.toLocaleString("en-IN")}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-white uppercase whitespace-nowrap">
+                    {w.method}
+                  </td>
+                  <td className="px-4 py-3 text-xs font-mono text-gray-400 whitespace-nowrap">
+                    {w.utrNumber ||
+                      `UTR${w.id.replace(/-/g, "").slice(0, 10).toUpperCase()}`}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                         w.status === "approved"
-                          ? "oklch(0.6 0.2 145 / 15%)"
-                          : "oklch(0.75 0.15 85 / 15%)",
-                    }}
-                  >
-                    {w.status.toUpperCase()}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                          ? "text-green-400"
+                          : "text-yellow-400"
+                      }`}
+                      style={{
+                        background:
+                          w.status === "approved"
+                            ? "oklch(0.6 0.2 145 / 15%)"
+                            : "oklch(0.75 0.15 85 / 15%)",
+                      }}
+                    >
+                      {w.status.toUpperCase()}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Full-screen Receipt Modal */}

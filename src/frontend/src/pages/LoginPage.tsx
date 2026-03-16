@@ -367,7 +367,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <div className="space-y-3">
                 <div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                    <Mail className="w-3 h-3" /> Gmail ID
+                    <Mail className="w-3 h-3" /> Login ID (Email)
                   </div>
                   <input
                     type="email"

@@ -185,7 +185,7 @@ export default function LiveFundActivity() {
                         className="text-xs font-bold"
                         style={{ color: "#4ade80" }}
                       >
-                        LIVE
+                        Online
                       </span>
                     </div>
                   </div>

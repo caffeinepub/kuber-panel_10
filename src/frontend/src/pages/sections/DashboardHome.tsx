@@ -239,13 +239,13 @@ export default function DashboardHome() {
             {/* Text */}
             <div className="mt-auto">
               <div
-                className="text-sm font-bold leading-tight"
+                className="text-sm font-bold leading-tight truncate w-full"
                 style={{ color: locked ? "#444" : "#f1f5f9" }}
               >
                 {label}
               </div>
               <div
-                className="text-[11px] mt-0.5"
+                className="text-[11px] mt-0.5 line-clamp-2"
                 style={{ color: locked ? "#333" : `${accent}bb` }}
               >
                 {locked ? "Activate to unlock" : desc}
@@ -299,7 +299,7 @@ export default function DashboardHome() {
           </div>
           <p className="text-xs text-gray-400 mt-0.5">
             {isAdmin
-              ? "Admin Control Center — Full Access"
+              ? "Panel Active — Fund Management Dashboard"
               : isActivated
                 ? "Panel Active — Fund Management Dashboard"
                 : "Panel Not Activated"}
