@@ -1,26 +1,22 @@
 import { ArrowDownCircle, Coins } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import * as LocalStore from "../../utils/LocalStore";
+import type { CommissionLogEntry } from "../../utils/LocalStore";
 
 export default function MyCommission() {
-  const { commissionBalance, commissionHistory, setActiveSection, isAdmin } =
-    useApp();
+  const { setActiveSection, isAdmin } = useApp();
 
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const recentHistory = isAdmin
-    ? commissionHistory
-        .filter((c) => Number(c.date) / 1_000_000 > thirtyDaysAgo)
-        .sort((a, b) => Number(b.date) - Number(a.date))
+  const adminBalance = LocalStore.getAdminCommission();
+  const adminLog: CommissionLogEntry[] = LocalStore.getAdminCommissionLog();
+
+  const thirtyDaysAgo = new Date(
+    Date.now() - 30 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const recentLog = isAdmin
+    ? adminLog.filter((c) => c.date > thirtyDaysAgo).slice(0, 100)
     : [];
 
-  const displayBalance = isAdmin ? commissionBalance : 0;
-
-  const formatDate = (nano: bigint) =>
-    new Date(Number(nano) / 1_000_000).toLocaleDateString("en-IN");
-  const formatTime = (nano: bigint) =>
-    new Date(Number(nano) / 1_000_000).toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const displayBalance = isAdmin ? adminBalance : 0;
 
   const fundColors: Record<string, string> = {
     gaming: "oklch(0.6 0.2 280)",
@@ -28,6 +24,13 @@ export default function MyCommission() {
     mix: "oklch(0.75 0.15 85)",
     political: "oklch(0.6 0.2 25)",
   };
+
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN");
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   return (
     <div className="space-y-6">
@@ -52,6 +55,11 @@ export default function MyCommission() {
                 minimumFractionDigits: 2,
               })}
             </div>
+            {isAdmin && (
+              <div className="text-xs text-gray-500 mt-1">
+                15% commission from live fund transactions
+              </div>
+            )}
           </div>
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center"
@@ -101,16 +109,16 @@ export default function MyCommission() {
             </tr>
           </thead>
           <tbody>
-            {recentHistory.length === 0 ? (
+            {recentLog.length === 0 ? (
               <tr data-ocid="commission.empty_state">
                 <td colSpan={6} className="text-center py-10 text-gray-600">
                   {isAdmin
-                    ? "No commission history yet"
+                    ? "No commission yet. Turn ON Live Fund Activity to start."
                     : "Commission data not available"}
                 </td>
               </tr>
             ) : (
-              recentHistory.map((c, i) => (
+              recentLog.map((c, i) => (
                 <tr
                   key={c.id}
                   data-ocid={`commission.item.${i + 1}`}
@@ -118,10 +126,10 @@ export default function MyCommission() {
                   style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)" }}
                 >
                   <td className="px-4 py-3 text-xs text-gray-300">
-                    {formatDate(c.date)}
+                    {fmtDate(c.date)}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400">
-                    {formatTime(c.date)}
+                    {fmtTime(c.date)}
                   </td>
                   <td className="px-4 py-3 text-xs text-white font-medium">
                     {c.bankName}
@@ -134,7 +142,7 @@ export default function MyCommission() {
                       className="px-2 py-0.5 rounded-full text-xs font-bold uppercase"
                       style={{
                         color: fundColors[c.fundType] || "oklch(0.75 0.15 85)",
-                        background: `${fundColors[c.fundType] || "oklch(0.75 0.15 85)"} / 15%`,
+                        background: "oklch(0.75 0.15 85 / 10%)",
                       }}
                     >
                       {c.fundType}

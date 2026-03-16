@@ -1,34 +1,11 @@
 import { Lock, Mail, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import * as LocalStore from "../utils/LocalStore";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 const ADMIN_PASSWORD = "Admin@123";
 const GIF_LOGO =
   "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
-
-const USERS_KEY = "kuber_registered_users";
-
-export interface RegisteredUser {
-  email: string;
-  password: string;
-  registeredAt: string;
-}
-
-export function getRegisteredUsers(): RegisteredUser[] {
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveUser(email: string, password: string) {
-  const users = getRegisteredUsers();
-  if (!users.find((u) => u.email === email)) {
-    users.push({ email, password, registeredAt: new Date().toISOString() });
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  }
-}
 
 interface LoginPageProps {
   onLogin: (email: string) => void;
@@ -63,7 +40,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleSubmit = async () => {
     setError("");
-    if (!email.trim()) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
       setError("Gmail ID required");
       return;
     }
@@ -75,16 +53,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setError("Passwords do not match");
       return;
     }
-    if (email.toLowerCase() === ADMIN_EMAIL && password !== ADMIN_PASSWORD) {
-      setError("Invalid admin credentials");
+
+    // Admin login
+    if (trimmedEmail === ADMIN_EMAIL) {
+      if (password !== ADMIN_PASSWORD) {
+        setError("Invalid admin credentials");
+        return;
+      }
+      setLoading(true);
+      await new Promise((r) => setTimeout(r, 600));
+      setLoading(false);
+      onLogin(trimmedEmail);
       return;
     }
 
-    if (tab === "login" && email.toLowerCase() !== ADMIN_EMAIL) {
-      const users = getRegisteredUsers();
-      const found = users.find(
-        (u) => u.email.toLowerCase() === email.toLowerCase().trim(),
-      );
+    if (tab === "login") {
+      const users = LocalStore.getRegisteredUsers();
+      const found = users.find((u) => u.email.toLowerCase() === trimmedEmail);
       if (!found) {
         setError("Account not found. Please register first.");
         return;
@@ -95,16 +80,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       }
     }
 
+    if (tab === "register") {
+      const existingUsers = LocalStore.getRegisteredUsers();
+      if (existingUsers.find((u) => u.email.toLowerCase() === trimmedEmail)) {
+        setError("An account with this email already exists. Please login.");
+        return;
+      }
+    }
+
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
     setLoading(false);
 
     if (tab === "register") {
-      saveUser(email.toLowerCase().trim(), password);
+      LocalStore.saveRegisteredUser(trimmedEmail, password);
       setRegisterSuccess(true);
       return;
     }
-    onLogin(email.toLowerCase().trim());
+    onLogin(trimmedEmail);
   };
 
   if (registerSuccess) {
@@ -251,52 +244,28 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               className="flex rounded-xl p-1 mb-5"
               style={{ background: "oklch(0.05 0.005 220)" }}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("login");
-                  setError("");
-                }}
-                data-ocid="auth.login_tab"
-                className={`flex-1 py-2 text-xs font-bold rounded-lg tracking-widest transition-all ${
-                  tab === "login"
-                    ? "text-black"
-                    : "text-gray-500 hover:text-gray-300"
-                }`}
-                style={
-                  tab === "login"
-                    ? {
-                        background:
-                          "linear-gradient(135deg, oklch(0.82 0.17 85), oklch(0.67 0.13 85))",
-                      }
-                    : {}
-                }
-              >
-                LOGIN
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("register");
-                  setError("");
-                }}
-                data-ocid="auth.register_tab"
-                className={`flex-1 py-2 text-xs font-bold rounded-lg tracking-widest transition-all ${
-                  tab === "register"
-                    ? "text-black"
-                    : "text-gray-500 hover:text-gray-300"
-                }`}
-                style={
-                  tab === "register"
-                    ? {
-                        background:
-                          "linear-gradient(135deg, oklch(0.82 0.17 85), oklch(0.67 0.13 85))",
-                      }
-                    : {}
-                }
-              >
-                REGISTER
-              </button>
+              {(["login", "register"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    setTab(t);
+                    setError("");
+                  }}
+                  data-ocid={`auth.${t}_tab`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg tracking-widest transition-all uppercase ${tab === t ? "text-black" : "text-gray-500 hover:text-gray-300"}`}
+                  style={
+                    tab === t
+                      ? {
+                          background:
+                            "linear-gradient(135deg, oklch(0.82 0.17 85), oklch(0.67 0.13 85))",
+                        }
+                      : {}
+                  }
+                >
+                  {t}
+                </button>
+              ))}
             </div>
 
             <div className="mb-4">

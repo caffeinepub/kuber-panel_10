@@ -3,6 +3,7 @@ import {
   ArrowDownCircle,
   Building2,
   CheckSquare,
+  ChevronLeft,
   Code2,
   Coins,
   FileText,
@@ -19,7 +20,6 @@ import {
   TrendingUp,
   Users,
   Vote,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
@@ -104,7 +104,6 @@ function renderSectionContent(activeSection: string) {
 
 function WelcomePopup({ onClose }: { onClose: () => void }) {
   const [visible, setVisible] = useState(true);
-
   useEffect(() => {
     const t1 = setTimeout(() => setVisible(false), 2800);
     const t2 = setTimeout(onClose, 3300);
@@ -157,7 +156,14 @@ function WelcomePopup({ onClose }: { onClose: () => void }) {
 }
 
 export default function DashboardLayout() {
-  const { activeSection, setActiveSection, isAdmin, logout } = useApp();
+  const {
+    activeSection,
+    setActiveSection,
+    isAdmin,
+    isActivated,
+    userActivation,
+    logout,
+  } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => {
@@ -168,14 +174,16 @@ export default function DashboardLayout() {
   const menuRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const isOverlayOpen = activeSection !== "dashboard";
+  const isOnDashboard = activeSection === "dashboard";
   const allMenuItems = [...userMenuItems, ...(isAdmin ? adminMenuItems : [])];
   const currentItem = allMenuItems.find((m) => m.id === activeSection);
   const currentLabel = currentItem?.label || "Dashboard";
   const CurrentIcon = currentItem?.Icon;
-  const closeOverlay = () => setActiveSection("dashboard" as any);
-
   const loginId = localStorage.getItem("kuber_user_email") || "Kuber User";
+
+  // Detect if admin deactivated user while they're logged in
+  const wasDeactivatedByAdmin =
+    !isAdmin && userActivation?.deactivatedByAdmin === true;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -189,22 +197,50 @@ export default function DashboardLayout() {
   }, []);
 
   return (
-    <div className="official-panel flex h-screen overflow-hidden">
+    <div className="official-panel flex flex-col h-screen overflow-hidden">
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
+
+      {/* Admin deactivation notice */}
+      {wasDeactivatedByAdmin && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[998] px-4 py-2 text-center text-xs font-bold"
+          style={{
+            background: "oklch(0.5 0.2 25)",
+            color: "white",
+          }}
+        >
+          Your account has been deactivated by admin. Contact admin for
+          re-activation code.
+        </div>
+      )}
 
       <div className="gold-top-stripe fixed top-0 left-0 right-0 z-50" />
 
-      <main className="flex-1 overflow-y-auto mt-[3px] flex flex-col">
-        {/* Top bar */}
-        <div
-          className="sticky top-0 z-30 flex items-center justify-between px-4 py-3"
-          style={{
-            background: "oklch(0.08 0.005 220 / 95%)",
-            borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)",
-            backdropFilter: "blur(12px)",
-          }}
-        >
-          <div className="flex items-center gap-3">
+      {/* Top bar */}
+      <div
+        className="sticky top-[3px] z-30 flex items-center justify-between px-4 py-3 flex-shrink-0"
+        style={{
+          background: "oklch(0.08 0.005 220 / 97%)",
+          borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          {!isOnDashboard ? (
+            <button
+              type="button"
+              data-ocid="header.back_button"
+              onClick={() => setActiveSection("dashboard" as any)}
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200"
+              style={{
+                background: "oklch(0.65 0.2 220 / 10%)",
+                border: "1px solid oklch(0.65 0.2 220 / 25%)",
+                color: "oklch(0.75 0.18 220)",
+              }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          ) : (
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
@@ -218,7 +254,6 @@ export default function DashboardLayout() {
                   border: "1px solid oklch(0.65 0.2 220 / 25%)",
                   color: "oklch(0.75 0.18 220)",
                 }}
-                title="Open menu"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -270,7 +305,6 @@ export default function DashboardLayout() {
                     >
                       Main Menu
                     </div>
-
                     {userMenuItems.map(({ id, label, Icon }) => (
                       <button
                         type="button"
@@ -382,258 +416,226 @@ export default function DashboardLayout() {
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Right: live + user */}
-          <div className="flex items-center gap-2">
+          {!isOnDashboard && CurrentIcon && (
+            <div className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{
+                  background: "oklch(0.65 0.2 220 / 15%)",
+                  border: "1px solid oklch(0.65 0.2 220 / 30%)",
+                }}
+              >
+                <CurrentIcon className="w-3.5 h-3.5 gold-text" />
+              </div>
+              <span className="text-sm font-bold text-white">
+                {currentLabel}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Activation status badge */}
+          {!isAdmin && (
             <div
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full"
               style={{
-                background: "oklch(0.62 0.2 145 / 12%)",
-                border: "1px solid oklch(0.62 0.2 145 / 30%)",
+                background: isActivated
+                  ? "oklch(0.62 0.2 145 / 12%)"
+                  : "oklch(0.5 0.2 25 / 12%)",
+                border: isActivated
+                  ? "1px solid oklch(0.62 0.2 145 / 30%)"
+                  : "1px solid oklch(0.5 0.2 25 / 30%)",
               }}
             >
-              <span className="live-dot" />
               <span
                 className="text-[10px] font-bold tracking-wider"
-                style={{ color: "oklch(0.72 0.18 145)" }}
+                style={{
+                  color: isActivated
+                    ? "oklch(0.72 0.18 145)"
+                    : "oklch(0.65 0.2 25)",
+                }}
               >
-                LIVE
+                {isActivated ? "✓ ACTIVE" : "NOT ACTIVATED"}
               </span>
             </div>
+          )}
 
-            <div className="relative" ref={profileRef}>
-              <button
-                type="button"
-                data-ocid="header.user_button"
-                onClick={() => setProfileOpen((v) => !v)}
-                className="flex items-center gap-2 px-2 py-1 rounded-xl transition-all duration-200"
-                style={{
-                  background: profileOpen
-                    ? "oklch(0.65 0.2 220 / 12%)"
-                    : "transparent",
-                  border: profileOpen
-                    ? "1px solid oklch(0.65 0.2 220 / 25%)"
-                    : "1px solid transparent",
-                }}
-                title="View profile"
-              >
-                <div className="text-right hidden sm:block">
-                  <div className="text-[10px] gold-text font-bold tracking-wider">
-                    {isAdmin ? "● ADMIN" : "● USER"}
-                  </div>
-                  <div className="text-[10px] text-gray-500 truncate max-w-28">
-                    {loginId.length > 16 ? `${loginId.slice(0, 16)}…` : loginId}
-                  </div>
-                </div>
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center gold-glow flex-shrink-0"
-                  style={{
-                    background: "oklch(0.65 0.2 220 / 15%)",
-                    border: "1px solid oklch(0.65 0.2 220 / 40%)",
-                  }}
-                >
-                  <span className="text-xs gold-text font-bold">
-                    {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
-                  </span>
-                </div>
-              </button>
-
-              {profileOpen && (
-                <div
-                  className="absolute right-0 top-full mt-2 z-50"
-                  style={{
-                    width: "240px",
-                    background: "oklch(0.09 0.01 220)",
-                    border: "1px solid oklch(0.65 0.2 220 / 25%)",
-                    borderRadius: "14px",
-                    boxShadow: "0 16px 48px oklch(0 0 0 / 70%)",
-                  }}
-                  data-ocid="header.user.panel"
-                >
-                  <div
-                    className="px-4 py-4 flex flex-col items-center text-center"
-                    style={{
-                      borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)",
-                      background: "oklch(0.08 0.005 220)",
-                      borderRadius: "14px 14px 0 0",
-                    }}
-                  >
-                    <div
-                      className="w-14 h-14 rounded-full flex items-center justify-center mb-3 gold-glow"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, oklch(0.65 0.2 220 / 30%), oklch(0.75 0.17 85 / 20%))",
-                        border: "2px solid oklch(0.75 0.17 85 / 40%)",
-                      }}
-                    >
-                      <span className="text-2xl font-black gold-text">
-                        {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
-                      </span>
-                    </div>
-                    <div
-                      className="px-3 py-0.5 rounded-full mb-2 text-[10px] font-bold tracking-widest"
-                      style={{
-                        background: isAdmin
-                          ? "oklch(0.62 0.2 145 / 15%)"
-                          : "oklch(0.65 0.2 220 / 15%)",
-                        border: isAdmin
-                          ? "1px solid oklch(0.62 0.2 145 / 40%)"
-                          : "1px solid oklch(0.65 0.2 220 / 40%)",
-                        color: isAdmin
-                          ? "oklch(0.72 0.18 145)"
-                          : "oklch(0.75 0.18 220)",
-                      }}
-                    >
-                      {isAdmin ? "ADMIN" : "USER"}
-                    </div>
-                  </div>
-
-                  <div className="px-4 py-3">
-                    <div
-                      className="text-[9px] uppercase tracking-[0.15em] mb-1 font-semibold"
-                      style={{ color: "oklch(0.65 0.2 220 / 55%)" }}
-                    >
-                      Login ID
-                    </div>
-                    <div
-                      className="text-sm font-medium text-white break-all"
-                      data-ocid="header.user.login_id"
-                    >
-                      {loginId}
-                    </div>
-                  </div>
-
-                  <div
-                    className="px-3 pb-3"
-                    style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 12%)" }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileOpen(false);
-                        logout();
-                      }}
-                      data-ocid="header.logout_button"
-                      className="w-full flex items-center justify-center gap-2 mt-3 py-2 rounded-lg text-xs font-medium transition-all"
-                      style={{
-                        background: "oklch(0.5 0.2 25 / 12%)",
-                        border: "1px solid oklch(0.5 0.2 25 / 30%)",
-                        color: "oklch(0.7 0.18 25)",
-                      }}
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 flex-1">
-          <DashboardHome />
-        </div>
-
-        <footer
-          className="px-6 py-3 text-center"
-          style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 10%)" }}
-        >
-          <p className="text-[10px] text-gray-600">
-            © {new Date().getFullYear()} KUBER PANEL · Licensed Financial
-            Dashboard ·{" "}
-            <a
-              href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-400 transition-colors"
-            >
-              Built with ♥ using caffeine.ai
-            </a>
-          </p>
-        </footer>
-      </main>
-
-      {/* Overlay backdrop */}
-      <div
-        data-ocid="overlay.panel"
-        className="fixed inset-0 z-40 transition-all duration-300"
-        style={{
-          background: "oklch(0 0 0 / 60%)",
-          backdropFilter: isOverlayOpen ? "blur(2px)" : "none",
-          opacity: isOverlayOpen ? 1 : 0,
-          pointerEvents: isOverlayOpen ? "auto" : "none",
-          top: "3px",
-        }}
-        onClick={closeOverlay}
-        onKeyDown={(e) => e.key === "Escape" && closeOverlay()}
-        role="button"
-        tabIndex={-1}
-        aria-label="Close panel"
-      />
-
-      {/* Slide-in overlay panel */}
-      <div
-        className="fixed top-[3px] right-0 bottom-0 z-50 flex flex-col overflow-hidden"
-        style={{
-          width: "min(500px, 92vw)",
-          background: "oklch(0.09 0.008 220)",
-          borderLeft: "1px solid oklch(0.65 0.2 220 / 25%)",
-          boxShadow: "-8px 0 40px oklch(0 0 0 / 60%)",
-          transform: isOverlayOpen ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
-        }}
-      >
-        <div
-          className="flex items-center gap-3 px-5 py-4 flex-shrink-0"
-          style={{
-            background: "oklch(0.08 0.005 220)",
-            borderBottom: "1px solid oklch(0.65 0.2 220 / 20%)",
-          }}
-        >
-          {CurrentIcon && (
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              data-ocid="header.user_button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex items-center gap-2 px-2 py-1 rounded-xl transition-all duration-200"
               style={{
-                background: "oklch(0.65 0.2 220 / 15%)",
-                border: "1px solid oklch(0.65 0.2 220 / 30%)",
+                background: profileOpen
+                  ? "oklch(0.65 0.2 220 / 12%)"
+                  : "transparent",
+                border: profileOpen
+                  ? "1px solid oklch(0.65 0.2 220 / 25%)"
+                  : "1px solid transparent",
               }}
             >
-              <CurrentIcon className="w-4 h-4 gold-text" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-white truncate">
-              {currentLabel}
-            </div>
-            <div
-              className="text-[10px] tracking-wider uppercase"
-              style={{ color: "oklch(0.65 0.2 220 / 55%)" }}
-            >
-              KUBER PANEL
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={closeOverlay}
-            data-ocid="overlay.close_button"
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 flex-shrink-0"
-            style={{
-              background: "oklch(0.65 0.2 220 / 10%)",
-              border: "1px solid oklch(0.65 0.2 220 / 20%)",
-              color: "oklch(0.75 0.1 220)",
-            }}
-            title="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+              <div className="text-right hidden sm:block">
+                <div className="text-[10px] gold-text font-bold tracking-wider">
+                  {isAdmin ? "● ADMIN" : "● USER"}
+                </div>
+                <div className="text-[10px] text-gray-500 truncate max-w-28">
+                  {loginId.length > 16 ? `${loginId.slice(0, 16)}…` : loginId}
+                </div>
+              </div>
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center gold-glow flex-shrink-0"
+                style={{
+                  background: "oklch(0.65 0.2 220 / 15%)",
+                  border: "1px solid oklch(0.65 0.2 220 / 40%)",
+                }}
+              >
+                <span className="text-xs gold-text font-bold">
+                  {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
+                </span>
+              </div>
+            </button>
 
-        <div className="flex-1 overflow-y-auto p-5">
-          {isOverlayOpen && renderSectionContent(activeSection)}
+            {profileOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 z-50"
+                style={{
+                  width: "240px",
+                  background: "oklch(0.09 0.01 220)",
+                  border: "1px solid oklch(0.65 0.2 220 / 25%)",
+                  borderRadius: "14px",
+                  boxShadow: "0 16px 48px oklch(0 0 0 / 70%)",
+                }}
+                data-ocid="header.user.panel"
+              >
+                <div
+                  className="px-4 py-4 flex flex-col items-center text-center"
+                  style={{
+                    borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)",
+                    background: "oklch(0.08 0.005 220)",
+                    borderRadius: "14px 14px 0 0",
+                  }}
+                >
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center mb-3 gold-glow"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, oklch(0.65 0.2 220 / 30%), oklch(0.75 0.17 85 / 20%))",
+                      border: "2px solid oklch(0.75 0.17 85 / 40%)",
+                    }}
+                  >
+                    <span className="text-2xl font-black gold-text">
+                      {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
+                    </span>
+                  </div>
+                  <div
+                    className="px-3 py-0.5 rounded-full mb-2 text-[10px] font-bold tracking-widest"
+                    style={{
+                      background: isAdmin
+                        ? "oklch(0.62 0.2 145 / 15%)"
+                        : "oklch(0.65 0.2 220 / 15%)",
+                      border: isAdmin
+                        ? "1px solid oklch(0.62 0.2 145 / 40%)"
+                        : "1px solid oklch(0.65 0.2 220 / 40%)",
+                      color: isAdmin
+                        ? "oklch(0.72 0.18 145)"
+                        : "oklch(0.75 0.18 220)",
+                    }}
+                  >
+                    {isAdmin ? "ADMIN" : "USER"}
+                  </div>
+                  {!isAdmin && (
+                    <div
+                      className="px-2 py-0.5 rounded-full text-[9px] font-semibold"
+                      style={{
+                        background: isActivated
+                          ? "oklch(0.62 0.2 145 / 12%)"
+                          : "oklch(0.5 0.2 25 / 12%)",
+                        color: isActivated
+                          ? "oklch(0.72 0.2 145)"
+                          : "oklch(0.65 0.2 25)",
+                      }}
+                    >
+                      {isActivated ? "Panel Active" : "Panel Not Activated"}
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-4 py-3">
+                  <div
+                    className="text-[9px] uppercase tracking-[0.15em] mb-1 font-semibold"
+                    style={{ color: "oklch(0.65 0.2 220 / 55%)" }}
+                  >
+                    Login ID
+                  </div>
+                  <div
+                    className="text-sm font-medium text-white break-all"
+                    data-ocid="header.user.login_id"
+                  >
+                    {loginId}
+                  </div>
+                </div>
+
+                <div
+                  className="px-3 pb-3"
+                  style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 12%)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      logout();
+                    }}
+                    data-ocid="header.logout_button"
+                    className="w-full flex items-center justify-center gap-2 mt-3 py-2 rounded-lg text-xs font-medium transition-all"
+                    style={{
+                      background: "oklch(0.5 0.2 25 / 12%)",
+                      border: "1px solid oklch(0.5 0.2 25 / 30%)",
+                      color: "oklch(0.7 0.18 25)",
+                    }}
+                  >
+                    <LogOut className="w-3.5 h-3.5" /> Logout
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto">
+        {isOnDashboard ? (
+          <div className="p-4">
+            <DashboardHome />
+          </div>
+        ) : (
+          <div className="p-4">{renderSectionContent(activeSection)}</div>
+        )}
+
+        {isOnDashboard && (
+          <footer
+            className="px-6 py-3 text-center"
+            style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 10%)" }}
+          >
+            <p className="text-[10px] text-gray-600">
+              © {new Date().getFullYear()} KUBER PANEL · Licensed Financial
+              Dashboard ·{" "}
+              <a
+                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-400 transition-colors"
+              >
+                Built with ♥ using caffeine.ai
+              </a>
+            </p>
+          </footer>
+        )}
+      </main>
     </div>
   );
 }

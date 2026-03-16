@@ -4,6 +4,7 @@ import {
   Clock,
   Edit2,
   Eye,
+  KeyRound,
   Plus,
   Trash2,
   X,
@@ -11,9 +12,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { BankAccountData } from "../../backend";
 import { useApp } from "../../context/AppContext";
-import { useActor } from "../../hooks/useActor";
+import * as LocalStore from "../../utils/LocalStore";
+import type { BankAccountLS } from "../../utils/LocalStore";
 
 const statusConfig = {
   pending: {
@@ -51,66 +52,78 @@ const emptyForm = {
 };
 
 export default function AddBankAccount() {
-  const { bankAccounts, refresh } = useApp();
-  const { actor } = useActor();
+  const { isActivated, isAdmin, setActiveSection } = useApp();
+  const email = localStorage.getItem("kuber_user_email") ?? "";
+  const [_refreshKey, setRefreshKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [editId, setEditId] = useState<string | null>(null);
-  const [viewAccount, setViewAccount] = useState<BankAccountData | null>(null);
+  const [viewAccount, setViewAccount] = useState<BankAccountLS | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!actor) return;
+  const triggerRefresh = () => setRefreshKey((k) => k + 1);
+
+  // Show activation gate if not activated
+  if (!isAdmin && !isActivated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 space-y-4">
+        <div
+          className="w-20 h-20 rounded-2xl flex items-center justify-center"
+          style={{
+            background: "oklch(0.75 0.15 85 / 12%)",
+            border: "2px solid oklch(0.75 0.15 85 / 30%)",
+          }}
+        >
+          <KeyRound className="w-10 h-10 gold-text" />
+        </div>
+        <div>
+          <div className="text-xl font-black text-white mb-2">
+            Activation Required
+          </div>
+          <div className="text-sm text-gray-400">
+            You need to activate your panel before adding a bank account.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSection("activation" as any)}
+          data-ocid="add_bank.activate_button"
+          className="px-6 py-3 rounded-xl text-sm font-bold text-black gold-gradient"
+        >
+          Activate Panel Now
+        </button>
+      </div>
+    );
+  }
+
+  const handleSubmit = () => {
     if (!form.bankName || !form.accountNumber || !form.ifscCode) {
       toast.error("Please fill all required fields");
       return;
     }
     setLoading(true);
-    try {
-      if (editId) {
-        await actor.updateBankAccount(
-          editId,
-          form.accountType,
-          form.bankName,
-          form.accountHolderName,
-          form.accountNumber,
-          form.ifscCode,
-          form.mobileNumber,
-          form.internetBankingId,
-          form.internetBankingPassword,
-          form.upiId,
-          form.qrCodeUrl,
-          form.fundType,
-        );
-        toast.success("Bank account updated");
-      } else {
-        await actor.createBankAccount(
-          form.accountType,
-          form.bankName,
-          form.accountHolderName,
-          form.accountNumber,
-          form.ifscCode,
-          form.mobileNumber,
-          form.internetBankingId,
-          form.internetBankingPassword,
-          form.upiId,
-          form.qrCodeUrl,
-          form.fundType,
-        );
-        toast.success("Bank account submitted for approval");
+    setTimeout(() => {
+      try {
+        if (editId) {
+          LocalStore.updateBankAccount(editId, form);
+          toast.success("Bank account updated");
+        } else {
+          LocalStore.createBankAccount({ ...form, userId: email });
+          toast.success("Bank account submitted for approval");
+        }
+        setShowForm(false);
+        setForm({ ...emptyForm });
+        setEditId(null);
+        triggerRefresh();
+      } catch {
+        toast.error("Failed to save bank account");
+      } finally {
+        setLoading(false);
       }
-      setShowForm(false);
-      setForm({ ...emptyForm });
-      setEditId(null);
-      refresh();
-    } catch (_e) {
-      toast.error("Failed to save bank account");
-    } finally {
-      setLoading(false);
-    }
+    }, 400);
   };
 
-  const handleEdit = (acc: BankAccountData) => {
+  const handleEdit = (acc: BankAccountLS) => {
     setForm({
       accountType: acc.accountType,
       bankName: acc.bankName,
@@ -126,25 +139,18 @@ export default function AddBankAccount() {
     });
     setEditId(acc.id);
     setShowForm(true);
+    setViewAccount(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!actor || !confirm("Delete this bank account?")) return;
-    try {
-      await actor.deleteBankAccount(id);
-      toast.success("Bank account deleted");
-      refresh();
-    } catch {
-      toast.error("Failed to delete");
-    }
+  const handleDelete = (id: string) => {
+    if (!confirm("Delete this bank account?")) return;
+    LocalStore.deleteBankAccount(id);
+    toast.success("Bank account deleted");
+    setViewAccount(null);
+    triggerRefresh();
   };
 
-  const field = (
-    label: string,
-    key: keyof typeof form,
-    type = "text",
-    ocid = "",
-  ) => (
+  const field = (label: string, key: keyof typeof emptyForm, type = "text") => (
     <div>
       <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
         {label}
@@ -153,7 +159,7 @@ export default function AddBankAccount() {
         type={type}
         value={form[key]}
         onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-        data-ocid={ocid || `add_bank.${key}.input`}
+        data-ocid={`add_bank.${key}.input`}
         className="w-full px-3 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none"
         style={{
           background: "oklch(0.13 0 0)",
@@ -162,6 +168,8 @@ export default function AddBankAccount() {
       />
     </div>
   );
+
+  const accounts = LocalStore.getUserBankAccounts(email);
 
   return (
     <div className="space-y-6">
@@ -175,32 +183,25 @@ export default function AddBankAccount() {
             setForm({ ...emptyForm });
           }}
           data-ocid="add_bank.open_modal_button"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-black gold-gradient"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-black gold-gradient"
         >
           <Plus className="w-4 h-4" />
-          Add New Bank
+          {showForm ? "Cancel" : "Add New"}
         </button>
       </div>
 
-      {/* Form */}
+      {/* Add/Edit Form */}
       {showForm && (
-        <div className="dark-card rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-white">
-              {editId ? "Edit Bank Account" : "New Bank Account"}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="text-gray-500 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div
+          className="dark-card rounded-xl p-5 space-y-4"
+          data-ocid="add_bank.form.panel"
+        >
+          <h3 className="text-sm font-bold gold-text">
+            {editId ? "Edit Bank Account" : "New Bank Account"}
+          </h3>
+          <div className="grid grid-cols-1 gap-3">
             <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
                 Account Type
               </div>
               <select
@@ -208,16 +209,15 @@ export default function AddBankAccount() {
                 onChange={(e) =>
                   setForm((p) => ({ ...p, accountType: e.target.value }))
                 }
-                data-ocid="add_bank.account_type.select"
+                data-ocid="add_bank.accountType.select"
                 className="w-full px-3 py-2.5 rounded-lg text-sm text-white outline-none"
                 style={{
                   background: "oklch(0.13 0 0)",
                   border: "1px solid oklch(0.75 0.15 85 / 20%)",
                 }}
               >
-                <option>Saving</option>
-                <option>Current</option>
-                <option>Corporate</option>
+                <option value="Saving">Saving Account</option>
+                <option value="Current">Current Account</option>
               </select>
             </div>
             {field("Bank Name *", "bankName")}
@@ -232,139 +232,175 @@ export default function AddBankAccount() {
               "password",
             )}
             {field("UPI ID", "upiId")}
-            {field("QR Code URL (optional)", "qrCodeUrl")}
+            <div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                Fund Type
+              </div>
+              <select
+                value={form.fundType}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, fundType: e.target.value }))
+                }
+                data-ocid="add_bank.fundType.select"
+                className="w-full px-3 py-2.5 rounded-lg text-sm text-white outline-none"
+                style={{
+                  background: "oklch(0.13 0 0)",
+                  border: "1px solid oklch(0.75 0.15 85 / 20%)",
+                }}
+              >
+                <option value="gaming">Gaming Fund</option>
+                <option value="stock">Stock Fund</option>
+                <option value="mix">Mix Fund</option>
+                <option value="political">Political Fund</option>
+              </select>
+            </div>
           </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              data-ocid="add_bank.submit_button"
-              className="px-6 py-2.5 rounded-lg text-sm font-bold text-black gold-gradient disabled:opacity-50"
-            >
-              {loading
-                ? "Saving..."
-                : editId
-                  ? "Update Bank"
-                  : "Submit for Approval"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              data-ocid="add_bank.cancel_button"
-              className="px-6 py-2.5 rounded-lg text-sm text-gray-400 hover:text-white"
-              style={{ background: "oklch(0.13 0 0)" }}
-            >
-              Cancel
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            data-ocid="add_bank.submit_button"
+            className="w-full py-3 rounded-xl text-sm font-bold text-black gold-gradient disabled:opacity-50"
+          >
+            {loading
+              ? "Saving..."
+              : editId
+                ? "Update Account"
+                : "Submit for Approval"}
+          </button>
         </div>
       )}
 
-      {/* Bank list */}
+      {/* Accounts list */}
       <div className="space-y-3">
-        {bankAccounts.length === 0 && (
+        {accounts.length === 0 ? (
           <div
             data-ocid="add_bank.empty_state"
             className="dark-card rounded-xl p-10 text-center"
           >
             <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-700" />
-            <p className="text-gray-500">No bank accounts added yet</p>
+            <p className="text-gray-600 text-sm">No bank accounts added yet</p>
           </div>
-        )}
-        {bankAccounts.map((acc, i) => {
-          const cfg =
-            statusConfig[acc.status as keyof typeof statusConfig] ||
-            statusConfig.pending;
-          const StatusIcon = cfg.icon;
-          return (
-            <div
-              key={acc.id}
-              data-ocid={`add_bank.item.${i + 1}`}
-              className="dark-card rounded-xl p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ background: "oklch(0.75 0.15 85 / 15%)" }}
+        ) : (
+          accounts.map((acc, i) => {
+            const sc = statusConfig[acc.status];
+            const StatusIcon = sc.icon;
+            return (
+              <div
+                key={acc.id}
+                data-ocid={`add_bank.item.${i + 1}`}
+                className="dark-card rounded-xl p-4"
+                style={{ border: `1px solid ${sc.color} / 20%` }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    className="flex-1 text-left"
+                    onClick={() => setViewAccount(acc)}
+                    data-ocid={`add_bank.view_button.${i + 1}`}
                   >
-                    <span className="text-lg font-bold gold-text">
-                      {acc.bankName[0]}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-white text-sm">
-                      {acc.bankName}
+                    <div className="flex items-center gap-2 mb-1">
+                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <span className="font-bold text-sm text-white">
+                        {acc.bankName}
+                      </span>
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1"
+                        style={{ background: sc.bg, color: sc.color }}
+                      >
+                        <StatusIcon className="w-2.5 h-2.5" />
+                        {sc.label}
+                      </span>
                     </div>
                     <div className="text-xs text-gray-500">
-                      {acc.accountHolderName} •{" "}
-                      {acc.accountNumber
-                        .slice(-4)
-                        .padStart(acc.accountNumber.length, "*")}
+                      {acc.accountHolderName}
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
-                    style={{ color: cfg.color, background: cfg.bg }}
-                  >
-                    <StatusIcon className="w-3 h-3" /> {cfg.label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setViewAccount(acc)}
-                    data-ocid={`add_bank.view.button.${i + 1}`}
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-white"
-                    style={{ background: "oklch(0.14 0 0)" }}
-                  >
-                    <Eye className="w-3.5 h-3.5" />
+                    <div className="text-xs font-mono text-gray-600 mt-0.5">
+                      Acc: {acc.accountNumber} | IFSC: {acc.ifscCode}
+                    </div>
+                    <div className="text-[10px] text-gray-600 mt-0.5 capitalize">
+                      Fund: {acc.fundType}
+                    </div>
                   </button>
-                  {acc.status === "pending" && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleEdit(acc)}
-                      data-ocid={`add_bank.edit_button.${i + 1}`}
-                      className="p-1.5 rounded-lg text-gray-500 hover:text-white"
-                      style={{ background: "oklch(0.14 0 0)" }}
+                      onClick={() => setViewAccount(acc)}
+                      data-ocid={`add_bank.eye_button.${i + 1}`}
+                      className="p-1.5 rounded-lg"
+                      style={{
+                        background: "oklch(0.65 0.2 220 / 12%)",
+                        color: "oklch(0.75 0.18 220)",
+                      }}
+                      title="View details"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5" />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(acc.id)}
-                    data-ocid={`add_bank.delete_button.${i + 1}`}
-                    className="p-1.5 rounded-lg text-red-600 hover:text-red-400"
-                    style={{ background: "oklch(0.14 0 0)" }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    {acc.status === "pending" && (
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(acc)}
+                        data-ocid={`add_bank.edit_button.${i + 1}`}
+                        className="p-1.5 rounded-lg"
+                        style={{
+                          background: "oklch(0.75 0.15 85 / 12%)",
+                          color: "oklch(0.8 0.18 85)",
+                        }}
+                        title="Edit"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(acc.id)}
+                      data-ocid={`add_bank.delete_button.${i + 1}`}
+                      className="p-1.5 rounded-lg"
+                      style={{
+                        background: "oklch(0.4 0.15 25 / 15%)",
+                        color: "oklch(0.6 0.2 25)",
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
-      {/* View modal */}
+      {/* View Details Modal */}
       {viewAccount && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "oklch(0 0 0 / 80%)" }}
+          style={{ background: "oklch(0 0 0 / 85%)" }}
           data-ocid="add_bank.dialog"
         >
           <div
-            className="w-full max-w-md rounded-2xl p-6 space-y-3"
+            className="w-full max-w-sm rounded-2xl overflow-hidden"
             style={{
-              background: "oklch(0.1 0 0)",
-              border: "1px solid oklch(0.75 0.15 85 / 30%)",
+              background: "oklch(0.09 0.008 220)",
+              border: "1px solid oklch(0.65 0.2 220 / 35%)",
             }}
           >
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-white">Bank Account Details</h3>
+            <div
+              className="px-5 py-4 flex items-center justify-between"
+              style={{
+                background: "oklch(0.12 0.02 220)",
+                borderBottom: "1px solid oklch(0.65 0.2 220 / 20%)",
+              }}
+            >
+              <div>
+                <div className="font-black text-sm gold-text tracking-wider">
+                  Bank Account Details
+                </div>
+                <div className="text-[10px] text-gray-500">
+                  {viewAccount.bankName}
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setViewAccount(null)}
@@ -373,30 +409,44 @@ export default function AddBankAccount() {
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
-            {Object.entries({
-              "Bank Name": viewAccount.bankName,
-              "Account Type": viewAccount.accountType,
-              "Account Holder": viewAccount.accountHolderName,
-              "Account Number": viewAccount.accountNumber,
-              "IFSC Code": viewAccount.ifscCode,
-              Mobile: viewAccount.mobileNumber,
-              "UPI ID": viewAccount.upiId,
-              "IB ID": viewAccount.internetBankingId,
-            }).map(
-              ([k, v]) =>
-                v && (
+            <div
+              className="px-5 py-4 space-y-0 overflow-y-auto"
+              style={{ maxHeight: "70vh" }}
+            >
+              {[
+                ["Account Type", viewAccount.accountType],
+                ["Bank Name", viewAccount.bankName],
+                ["Account Holder", viewAccount.accountHolderName],
+                ["Account Number", viewAccount.accountNumber],
+                ["IFSC Code", viewAccount.ifscCode],
+                ["Mobile Number", viewAccount.mobileNumber],
+                ["Internet Banking ID", viewAccount.internetBankingId],
+                ["UPI ID", viewAccount.upiId],
+                ["Fund Type", viewAccount.fundType],
+                ["Status", viewAccount.status.toUpperCase()],
+                [
+                  "Added On",
+                  new Date(viewAccount.createdAt).toLocaleString("en-IN"),
+                ],
+              ].map(([k, v]) =>
+                v ? (
                   <div
                     key={k}
-                    className="flex justify-between py-1.5"
+                    className="flex justify-between items-start py-2.5 gap-3"
                     style={{
-                      borderBottom: "1px solid oklch(0.75 0.15 85 / 10%)",
+                      borderBottom: "1px solid oklch(0.65 0.2 220 / 8%)",
                     }}
                   >
-                    <span className="text-xs text-gray-500">{k}</span>
-                    <span className="text-xs text-white font-medium">{v}</span>
+                    <span className="text-[11px] text-gray-500 flex-shrink-0">
+                      {k}
+                    </span>
+                    <span className="text-[11px] font-semibold text-white text-right break-all">
+                      {v}
+                    </span>
                   </div>
-                ),
-            )}
+                ) : null,
+              )}
+            </div>
           </div>
         </div>
       )}

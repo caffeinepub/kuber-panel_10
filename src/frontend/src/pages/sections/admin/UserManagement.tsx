@@ -1,15 +1,92 @@
-import { Trash2 } from "lucide-react";
+import { Loader2, Trash2, UserCheck, UserMinus, Users } from "lucide-react";
 import { useState } from "react";
-import { getRegisteredUsers } from "../../LoginPage";
+import { toast } from "sonner";
+import * as LocalStore from "../../../utils/LocalStore";
+import type { RegisteredUser, UserActivation } from "../../../utils/LocalStore";
+
+interface UserRow {
+  user: RegisteredUser;
+  activation: UserActivation | null;
+}
+
+function loadUsers(): UserRow[] {
+  const users = LocalStore.getRegisteredUsers();
+  return users.map((u) => ({
+    user: u,
+    activation: LocalStore.getUserActivation(u.email),
+  }));
+}
+
+function FundBadges({ activation }: { activation: UserActivation | null }) {
+  if (!activation?.isActive || !activation.activatedFunds?.length)
+    return <span className="text-gray-600 text-xs">-</span>;
+  const funds = activation.activatedFunds;
+  const colors: Record<string, string> = {
+    gaming: "oklch(0.6 0.2 280)",
+    stock: "oklch(0.7 0.2 145)",
+    mix: "oklch(0.75 0.15 85)",
+    political: "oklch(0.6 0.2 25)",
+    all: "oklch(0.7 0.15 300)",
+  };
+  return (
+    <div className="flex flex-wrap gap-1">
+      {funds.map((f) => (
+        <span
+          key={f}
+          className="px-1.5 py-0.5 rounded text-[9px] font-bold capitalize"
+          style={{
+            background: `${colors[f] ?? "oklch(0.65 0.15 220)"} / 15%`,
+            color: colors[f] ?? "oklch(0.65 0.15 220)",
+            border: `1px solid ${colors[f] ?? "oklch(0.65 0.15 220)"} / 25%`,
+          }}
+        >
+          {f}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function UserManagement() {
-  const [users, setUsers] = useState(() => getRegisteredUsers());
+  const [rows, setRows] = useState<UserRow[]>(() => loadUsers());
+  const [acting, setActing] = useState<string | null>(null);
+  const [tab, setTab] = useState<"active" | "inactive">("active");
+
+  const refresh = () => setRows(loadUsers());
+
+  const activeRows = rows.filter((r) => r.activation?.isActive === true);
+  const inactiveRows = rows.filter((r) => !r.activation?.isActive);
+  const displayRows = tab === "active" ? activeRows : inactiveRows;
+
+  const handleActivate = (email: string) => {
+    setActing(email);
+    setTimeout(() => {
+      LocalStore.activateFundForUser(email, "all", "ADMIN-DIRECT");
+      toast.success(`User ${email} activated (all funds)`);
+      setActing(null);
+      refresh();
+    }, 300);
+  };
+
+  const handleDeactivate = (email: string) => {
+    setActing(email);
+    setTimeout(() => {
+      LocalStore.deactivateUserByAdmin(email);
+      toast.success(`User ${email} deactivated`);
+      setActing(null);
+      refresh();
+    }, 300);
+  };
 
   const handleDelete = (email: string) => {
-    if (!confirm(`Delete user ${email}?`)) return;
-    const updated = users.filter((u) => u.email !== email);
-    localStorage.setItem("kuber_registered_users", JSON.stringify(updated));
-    setUsers(updated);
+    if (!confirm(`Delete user ${email}? This cannot be undone.`)) return;
+    setActing(email);
+    setTimeout(() => {
+      LocalStore.deleteRegisteredUser(email);
+      toast.success(`User ${email} deleted`);
+      setActing(null);
+      refresh();
+    }, 300);
   };
 
   const fmtDate = (iso: string) =>
@@ -19,24 +96,33 @@ export default function UserManagement() {
       year: "numeric",
     });
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold gold-text">User Management</h2>
+  const totalUsers = rows.length;
 
-      <div className="grid grid-cols-2 gap-4">
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold gold-text">User Management</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage registered users and activations
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
         {[
+          { label: "Total", value: totalUsers, color: "oklch(0.75 0.15 85)" },
           {
-            label: "Total Users",
-            value: users.length,
-            color: "oklch(0.75 0.15 85)",
-          },
-          {
-            label: "Registered",
-            value: users.length,
+            label: "Active",
+            value: activeRows.length,
             color: "oklch(0.7 0.2 145)",
           },
+          {
+            label: "Inactive",
+            value: inactiveRows.length,
+            color: "oklch(0.65 0.2 25)",
+          },
         ].map(({ label, value, color }) => (
-          <div key={label} className="stat-card text-center">
+          <div key={label} className="stat-card text-center rounded-xl p-4">
             <div className="text-3xl font-black" style={{ color }}>
               {value}
             </div>
@@ -45,64 +131,190 @@ export default function UserManagement() {
         ))}
       </div>
 
-      <div className="dark-card rounded-xl overflow-hidden">
-        <table className="w-full" data-ocid="user_management.table">
-          <thead>
-            <tr style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}>
-              {["#", "Gmail ID", "Registered On", "Action"].map((h) => (
-                <th
-                  key={h}
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {users.length === 0 && (
-              <tr data-ocid="user_management.empty_state">
-                <td
-                  colSpan={4}
-                  className="text-center py-10 text-gray-600 text-sm"
-                >
-                  No registered users yet
-                </td>
-              </tr>
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {(["active", "inactive"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            data-ocid={`user_management.${t}.tab`}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all capitalize"
+            style={
+              tab === t
+                ? {
+                    background:
+                      "linear-gradient(135deg, oklch(0.82 0.17 85), oklch(0.67 0.13 85))",
+                    color: "black",
+                  }
+                : { background: "oklch(0.12 0 0)", color: "oklch(0.5 0 0)" }
+            }
+          >
+            {t === "active" ? (
+              <UserCheck className="w-4 h-4" />
+            ) : (
+              <UserMinus className="w-4 h-4" />
             )}
-            {users.map((user, i) => (
-              <tr
-                key={user.email}
-                data-ocid={`user_management.item.${i + 1}`}
-                className="table-row-hover"
-                style={{
-                  borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)",
-                }}
-              >
-                <td className="px-4 py-3 text-xs text-gray-500">{i + 1}</td>
-                <td className="px-4 py-3 text-sm text-white">{user.email}</td>
-                <td className="px-4 py-3 text-xs text-gray-400">
-                  {fmtDate(user.registeredAt)}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(user.email)}
-                    data-ocid={`user_management.delete_button.${i + 1}`}
-                    className="p-1.5 rounded-lg"
-                    style={{ background: "oklch(0.6 0.2 25 / 15%)" }}
-                    title="Delete"
-                  >
-                    <Trash2
-                      className="w-3.5 h-3.5"
-                      style={{ color: "oklch(0.65 0.2 25)" }}
-                    />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            {t === "active" ? "Active Users" : "Inactive Users"}
+            <span
+              className="px-1.5 py-0.5 rounded-full text-xs"
+              style={{
+                background: "rgba(0,0,0,0.2)",
+                color: tab === t ? "rgba(0,0,0,0.7)" : "oklch(0.5 0 0)",
+              }}
+            >
+              {t === "active" ? activeRows.length : inactiveRows.length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="dark-card rounded-xl overflow-hidden">
+        {displayRows.length === 0 ? (
+          <div
+            data-ocid="user_management.empty_state"
+            className="py-10 text-center text-gray-600 text-sm"
+          >
+            <Users className="w-12 h-12 mx-auto mb-3 text-gray-700" />
+            No {tab} users
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full" data-ocid="user_management.table">
+              <thead>
+                <tr
+                  style={{
+                    borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)",
+                  }}
+                >
+                  {[
+                    "#",
+                    "Gmail ID",
+                    "Reg. Date",
+                    "Status",
+                    "Activated Funds",
+                    "Actions",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {displayRows.map(({ user, activation }, i) => {
+                  const isActive = activation?.isActive === true;
+                  const isActing = acting === user.email;
+                  return (
+                    <tr
+                      key={user.email}
+                      data-ocid={`user_management.item.${i + 1}`}
+                      className="table-row-hover"
+                      style={{
+                        borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)",
+                      }}
+                    >
+                      <td className="px-3 py-3 text-xs text-gray-600">
+                        {i + 1}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="text-xs text-white font-medium break-all">
+                          {user.email}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="text-xs text-gray-500">
+                          {fmtDate(user.registeredAt)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                          style={
+                            isActive
+                              ? {
+                                  background: "oklch(0.6 0.2 145 / 15%)",
+                                  color: "oklch(0.7 0.2 145)",
+                                }
+                              : {
+                                  background: "oklch(0.4 0.1 25 / 15%)",
+                                  color: "oklch(0.65 0.2 25)",
+                                }
+                          }
+                        >
+                          {isActive
+                            ? "ACTIVE"
+                            : activation?.deactivatedByAdmin
+                              ? "DEACTIVATED"
+                              : "INACTIVE"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <FundBadges activation={activation} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {isActing ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                          ) : (
+                            <>
+                              {!isActive ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleActivate(user.email)}
+                                  data-ocid={`user_management.activate_button.${i + 1}`}
+                                  title="Activate user"
+                                  className="p-1.5 rounded-lg transition-colors"
+                                  style={{
+                                    background: "oklch(0.6 0.2 145 / 12%)",
+                                    color: "oklch(0.7 0.2 145)",
+                                  }}
+                                >
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeactivate(user.email)}
+                                  data-ocid={`user_management.deactivate_button.${i + 1}`}
+                                  title="Deactivate user"
+                                  className="p-1.5 rounded-lg transition-colors"
+                                  style={{
+                                    background: "oklch(0.5 0.2 25 / 12%)",
+                                    color: "oklch(0.65 0.2 25)",
+                                  }}
+                                >
+                                  <UserMinus className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(user.email)}
+                                data-ocid={`user_management.delete_button.${i + 1}`}
+                                title="Delete user"
+                                className="p-1.5 rounded-lg transition-colors"
+                                style={{
+                                  background: "oklch(0.4 0.15 25 / 15%)",
+                                  color: "oklch(0.6 0.2 25)",
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

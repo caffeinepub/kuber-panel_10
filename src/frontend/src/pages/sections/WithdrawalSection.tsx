@@ -1,8 +1,9 @@
-import { ArrowDownCircle, Clock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowDownCircle } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "../../context/AppContext";
 import { useActor } from "../../hooks/useActor";
+import * as LocalStore from "../../utils/LocalStore";
 
 type Method = "upi" | "bank" | "usdt";
 type BankMode = "IMPS" | "NEFT" | "RTGS";
@@ -34,43 +35,33 @@ const bankModes: {
 ];
 
 export default function WithdrawalSection() {
-  const { commissionBalance, refresh } = useApp();
+  const { isAdmin, refresh } = useApp();
   const { actor } = useActor();
   const [method, setMethod] = useState<Method>("upi");
   const [amount, setAmount] = useState("");
   const [upiId, setUpiId] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
+  const [accountHolderName, setAccountHolderName] = useState("");
   const [ifsc, setIfsc] = useState("");
   const [transferMode, setTransferMode] = useState<BankMode>("IMPS");
   const [usdtAddress, setUsdtAddress] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pendingTimer, setPendingTimer] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (pendingTimer !== null && pendingTimer > 0) {
-      const t = setTimeout(
-        () => setPendingTimer((prev) => (prev ?? 1) - 1),
-        1000,
-      );
-      return () => clearTimeout(t);
-    }
-    if (pendingTimer === 0) {
-      toast.success("Withdrawal approved automatically!");
-      setPendingTimer(null);
-      refresh();
-    }
-  }, [pendingTimer, refresh]);
+  const displayBalance = isAdmin ? LocalStore.getAdminCommission() : 0;
 
   const handleSubmit = async () => {
-    if (!actor) return;
     const amt = Number.parseFloat(amount);
     if (!amt || amt <= 0) {
       toast.error("Enter valid amount");
       return;
     }
-    if (amt > commissionBalance) {
-      toast.error("Insufficient commission balance");
+
+    const currentBalance = isAdmin ? LocalStore.getAdminCommission() : 0;
+    if (amt > currentBalance) {
+      toast.error(
+        `Insufficient balance. Available: ₹${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      );
       return;
     }
 
@@ -89,6 +80,7 @@ export default function WithdrawalSection() {
       methodDetails = JSON.stringify({
         bankName,
         accountNumber,
+        accountHolderName,
         ifsc,
         transferMode,
       });
@@ -102,22 +94,21 @@ export default function WithdrawalSection() {
 
     setLoading(true);
     try {
-      await actor.createWithdrawal(amt, method, methodDetails);
-      toast.success(
-        "Withdrawal request submitted. Auto-approving in 10 minutes.",
-      );
-      setPendingTimer(600);
+      if (actor) {
+        await actor.createWithdrawal(amt, method, methodDetails);
+      }
+      if (isAdmin) {
+        LocalStore.deductAdminCommission(amt);
+      }
+      toast.success("Withdrawal request submitted successfully!");
       setAmount("");
       refresh();
     } catch {
-      toast.error("Withdrawal failed");
+      toast.error("Withdrawal failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  const formatTimer = (s: number) =>
-    `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
   const inputClass =
     "w-full px-3 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none";
@@ -130,160 +121,160 @@ export default function WithdrawalSection() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold gold-text">Withdrawal</h2>
 
-      <div className="dark-card rounded-xl p-4 flex items-center justify-between">
+      <div className="dark-card rounded-xl p-5 flex items-center justify-between">
         <div>
-          <div className="text-xs text-gray-500">Available Balance</div>
-          <div className="text-2xl font-black gold-text">
-            ₹{commissionBalance.toLocaleString("en-IN")}
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+            Available Commission Balance
+          </div>
+          <div className="text-3xl font-black gold-text">
+            ₹
+            {displayBalance.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+            })}
           </div>
         </div>
-        {pendingTimer !== null && (
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-lg"
-            style={{ background: "oklch(0.75 0.15 85 / 15%)" }}
-          >
-            <Clock className="w-4 h-4 gold-text" />
-            <div>
-              <div className="text-xs text-gray-400">Auto-approve in</div>
-              <div className="font-bold gold-text">
-                {formatTimer(pendingTimer)}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div
-        className="flex rounded-lg p-1"
-        style={{ background: "oklch(0.08 0 0)" }}
-      >
-        {(["upi", "bank", "usdt"] as Method[]).map((m) => (
-          <button
-            type="button"
-            key={m}
-            onClick={() => setMethod(m)}
-            data-ocid={`withdrawal.${m}_tab`}
-            className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${
-              method === m
-                ? "gold-gradient text-black"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            {m === "upi" ? "UPI" : m === "bank" ? "Bank Transfer" : "USDT"}
-          </button>
-        ))}
-      </div>
-
-      <div className="dark-card rounded-xl p-5 space-y-4">
-        <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
-            Amount (₹)
-          </div>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Enter withdrawal amount"
-            data-ocid="withdrawal.amount.input"
-            className={inputClass}
-            style={inputStyle}
-          />
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center"
+          style={{ background: "oklch(0.75 0.15 85 / 12%)" }}
+        >
+          <ArrowDownCircle className="w-7 h-7 gold-text" />
         </div>
+      </div>
 
-        {method === "upi" && (
+      <div className="dark-card rounded-xl overflow-hidden">
+        <div
+          className="px-4 py-3"
+          style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
+        >
+          <div className="text-sm font-bold gold-text">
+            Select Withdrawal Method
+          </div>
+        </div>
+        <div className="p-4 space-y-5">
+          <div className="flex gap-2">
+            {(["upi", "bank", "usdt"] as Method[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                data-ocid={`withdrawal.${m}.tab`}
+                className="flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all"
+                style={
+                  method === m
+                    ? {
+                        background:
+                          "linear-gradient(135deg, oklch(0.82 0.17 85), oklch(0.67 0.13 85))",
+                        color: "black",
+                      }
+                    : { background: "oklch(0.12 0 0)", color: "oklch(0.5 0 0)" }
+                }
+              >
+                {m === "upi" ? "UPI" : m === "bank" ? "Bank Transfer" : "USDT"}
+              </button>
+            ))}
+          </div>
+
           <div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
-              UPI ID
+            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
+              Withdrawal Amount (₹)
             </div>
             <input
-              value={upiId}
-              onChange={(e) => setUpiId(e.target.value)}
-              placeholder="yourname@upi"
-              data-ocid="withdrawal.upi_id.input"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              data-ocid="withdrawal.amount.input"
               className={inputClass}
               style={inputStyle}
             />
           </div>
-        )}
 
-        {method === "bank" && (
-          <div className="space-y-4">
-            {/* IMPS/NEFT/RTGS selector */}
+          {method === "upi" && (
             <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">
-                Transfer Mode
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
+                UPI ID
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {bankModes.map(({ key, label, limit, desc }) => (
-                  <button
-                    type="button"
-                    key={key}
-                    onClick={() => setTransferMode(key)}
-                    data-ocid={`withdrawal.${key.toLowerCase()}_mode.toggle`}
-                    className="flex flex-col p-3 rounded-xl text-left transition-all"
-                    style={{
-                      background:
-                        transferMode === key
-                          ? "linear-gradient(135deg, oklch(0.65 0.2 220 / 25%), oklch(0.75 0.17 85 / 20%))"
-                          : "oklch(0.1 0 0)",
-                      border:
-                        transferMode === key
-                          ? "1.5px solid oklch(0.75 0.17 85 / 50%)"
-                          : "1.5px solid oklch(0.75 0.15 85 / 10%)",
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <div
-                        className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                        style={{
-                          borderColor:
-                            transferMode === key
-                              ? "oklch(0.82 0.17 85)"
-                              : "oklch(0.4 0 0)",
-                        }}
-                      >
-                        {transferMode === key && (
-                          <div
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ background: "oklch(0.82 0.17 85)" }}
-                          />
-                        )}
-                      </div>
-                      <span
-                        className="text-sm font-black"
-                        style={{
-                          color:
-                            transferMode === key
-                              ? "oklch(0.88 0.16 85)"
-                              : "oklch(0.7 0 0)",
-                        }}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                    <div
-                      className="text-[10px] font-semibold"
-                      style={{ color: "oklch(0.65 0.2 220)" }}
-                    >
-                      {desc}
-                    </div>
-                    <div
-                      className="text-[9px] mt-0.5"
-                      style={{ color: "oklch(0.55 0 0)" }}
-                    >
-                      {limit}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <input
+                type="text"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="yourname@upi"
+                data-ocid="withdrawal.upi_id.input"
+                className={inputClass}
+                style={inputStyle}
+              />
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3">
+          {method === "bank" && (
+            <div className="space-y-3">
               <div>
-                <div className="text-xs text-gray-400 mb-1 block">
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                  Transfer Mode
+                </div>
+                <div className="space-y-2">
+                  {bankModes.map(({ key, label, limit, desc }) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                      style={{
+                        background:
+                          transferMode === key
+                            ? "oklch(0.75 0.15 85 / 12%)"
+                            : "oklch(0.1 0 0)",
+                        border:
+                          transferMode === key
+                            ? "1px solid oklch(0.75 0.15 85 / 40%)"
+                            : "1px solid oklch(0.2 0 0)",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="transferMode"
+                        value={key}
+                        checked={transferMode === key}
+                        onChange={() => setTransferMode(key)}
+                        className="accent-yellow-400"
+                        data-ocid={`withdrawal.${key.toLowerCase()}.radio`}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-white">
+                            {label}
+                          </span>
+                          <span
+                            className="text-[10px] font-semibold"
+                            style={{ color: "oklch(0.75 0.15 85)" }}
+                          >
+                            {limit}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">{desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
+                  Account Holder Name
+                </div>
+                <input
+                  type="text"
+                  value={accountHolderName}
+                  onChange={(e) => setAccountHolderName(e.target.value)}
+                  placeholder="Account holder name"
+                  data-ocid="withdrawal.holder.input"
+                  className={inputClass}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
                   Bank Name
                 </div>
                 <input
+                  type="text"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   placeholder="Bank name"
@@ -293,10 +284,11 @@ export default function WithdrawalSection() {
                 />
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1 block">
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
                   Account Number
                 </div>
                 <input
+                  type="text"
                   value={accountNumber}
                   onChange={(e) => setAccountNumber(e.target.value)}
                   placeholder="Account number"
@@ -305,74 +297,50 @@ export default function WithdrawalSection() {
                   style={inputStyle}
                 />
               </div>
-              <div className="col-span-2">
-                <div className="text-xs text-gray-400 mb-1 block">
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
                   IFSC Code
                 </div>
                 <input
+                  type="text"
                   value={ifsc}
-                  onChange={(e) => setIfsc(e.target.value)}
-                  placeholder="IFSC Code"
+                  onChange={(e) => setIfsc(e.target.value.toUpperCase())}
+                  placeholder="IFSC code"
                   data-ocid="withdrawal.ifsc.input"
                   className={inputClass}
                   style={inputStyle}
                 />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {method === "usdt" && (
-          <div className="space-y-3">
-            <div
-              className="flex items-center gap-2 p-3 rounded-lg"
-              style={{
-                background: "oklch(0.6 0.15 180 / 10%)",
-                border: "1px solid oklch(0.6 0.15 180 / 20%)",
-              }}
-            >
-              <span
-                className="text-lg font-black"
-                style={{ color: "oklch(0.6 0.15 180)" }}
-              >
-                USDT
-              </span>
-              <span className="text-xs text-gray-400">
-                Tether - TRC20 / ERC20
-              </span>
-            </div>
+          {method === "usdt" && (
             <div>
-              <div className="text-xs text-gray-400 mb-1 block">
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
                 USDT Wallet Address
               </div>
               <input
+                type="text"
                 value={usdtAddress}
                 onChange={(e) => setUsdtAddress(e.target.value)}
-                placeholder="Enter USDT wallet address"
-                data-ocid="withdrawal.usdt_address.input"
+                placeholder="Enter USDT TRC20 address"
+                data-ocid="withdrawal.usdt.input"
                 className={inputClass}
                 style={inputStyle}
               />
             </div>
-          </div>
-        )}
+          )}
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={loading}
-          data-ocid="withdrawal.submit_button"
-          className="w-full py-3 rounded-lg text-sm font-bold text-black gold-gradient disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <ArrowDownCircle className="w-4 h-4" />
-          {loading ? "Processing..." : "Submit Withdrawal Request"}
-        </button>
-
-        <p className="text-center text-xs text-gray-600">
-          <Clock className="w-3 h-3 inline mr-1" />
-          Auto-approved after 10 minutes • Amount deducted from commission
-          balance
-        </p>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            data-ocid="withdrawal.submit_button"
+            className="w-full py-3 rounded-xl text-sm font-bold text-black gold-gradient disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? "Processing..." : "Submit Withdrawal Request"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "./components/ui/sonner";
 import { AppProvider } from "./context/AppContext";
 import DashboardLayout from "./pages/DashboardLayout";
 import LoginPage from "./pages/LoginPage";
+import * as LocalStore from "./utils/LocalStore";
+
+const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
@@ -18,6 +21,16 @@ export default function App() {
     localStorage.removeItem("kuber_user_email");
     setIsLoggedIn(false);
   };
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const email = localStorage.getItem("kuber_user_email") ?? "";
+    if (email.toLowerCase() === ADMIN_EMAIL) return;
+    const users = LocalStore.getRegisteredUsers();
+    if (!users.find((u) => u.email === email)) {
+      handleLogout();
+    }
+  });
 
   return (
     <>
