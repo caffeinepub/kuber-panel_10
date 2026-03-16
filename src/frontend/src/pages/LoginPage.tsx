@@ -4,10 +4,78 @@ import * as LocalStore from "../utils/LocalStore";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 const ADMIN_PASSWORD = "Admin@123";
-const LOGO = "/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png";
+const LOGO1 = "/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png";
+const LOGO2 = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
 
 interface LoginPageProps {
   onLogin: (email: string) => void;
+}
+
+function KuberLogo({
+  size = 90,
+  glow = true,
+}: { size?: number; glow?: boolean }) {
+  const [src, setSrc] = useState(LOGO1);
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "inline-block",
+        width: size,
+        height: size,
+      }}
+    >
+      {!failed ? (
+        <img
+          src={src}
+          alt="KUBER PANEL"
+          onError={() => {
+            if (src === LOGO1) setSrc(LOGO2);
+            else setFailed(true);
+          }}
+          style={{
+            display: "block",
+            width: size,
+            height: size,
+            objectFit: "contain",
+            filter: glow
+              ? "drop-shadow(0 0 18px rgba(212,160,23,0.55))"
+              : undefined,
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: size,
+            height: size,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #d4a017, #f0c040)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: size * 0.4,
+            fontWeight: 900,
+            color: "#000",
+          }}
+        >
+          K
+        </div>
+      )}
+      {glow && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            boxShadow: "0 0 32px 8px rgba(212,160,23,0.3)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 function WelcomePopup({
@@ -28,19 +96,9 @@ function WelcomePopup({
       style={{ background: "#000000" }}
       data-ocid="welcome.modal"
     >
-      <img
-        src="/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png"
-        alt="Kuber Panel"
-        style={{
-          width: 130,
-          height: 130,
-          objectFit: "contain",
-          filter: "drop-shadow(0 0 24px rgba(212,160,23,0.5))",
-          marginBottom: 24,
-        }}
-      />
+      <KuberLogo size={110} glow={true} />
       <div
-        className="text-2xl font-black tracking-[0.25em] mb-1"
+        className="text-2xl font-black tracking-[0.25em] mb-1 mt-6"
         style={{
           background: "linear-gradient(135deg, #f0c040, #d4a017, #f0c040)",
           WebkitBackgroundClip: "text",
@@ -201,19 +259,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         <div className="relative w-full max-w-sm">
           <div className="text-center mb-6">
-            <div className="relative mx-auto mb-4 w-fit">
-              <img
-                src={LOGO}
-                alt="Kuber Panel Logo"
-                className="w-28 h-28 mx-auto drop-shadow-2xl"
-              />
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  boxShadow: "0 0 40px 10px oklch(0.75 0.17 85 / 35%)",
-                  pointerEvents: "none",
-                }}
-              />
+            <div className="flex justify-center mb-4">
+              <KuberLogo size={88} glow={true} />
             </div>
             <h1
               className="text-3xl font-black tracking-[0.2em] mb-0.5"

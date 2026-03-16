@@ -304,44 +304,46 @@ export default function DashboardHome() {
                 ? "Panel Active — Fund Management Dashboard"
                 : "Panel Not Activated"}
           </p>
-          {!isAdmin && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <div
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold"
-                style={{
-                  background: isActivated
+          <div className="flex items-center gap-2 mt-1.5">
+            <div
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold"
+              style={{
+                background:
+                  isAdmin || isActivated
                     ? "oklch(0.62 0.2 145 / 15%)"
                     : "oklch(0.5 0.2 25 / 15%)",
-                  border: isActivated
+                border:
+                  isAdmin || isActivated
                     ? "1px solid oklch(0.62 0.2 145 / 30%)"
                     : "1px solid oklch(0.5 0.2 25 / 30%)",
-                  color: isActivated
+                color:
+                  isAdmin || isActivated
                     ? "oklch(0.72 0.2 145)"
                     : "oklch(0.65 0.2 25)",
-                }}
-              >
-                <div
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{
-                    background: isActivated
+              }}
+            >
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  background:
+                    isAdmin || isActivated
                       ? "oklch(0.72 0.2 145)"
                       : "oklch(0.65 0.2 25)",
-                  }}
-                />
-                {isActivated ? "ACTIVE" : "NOT ACTIVATED"}
-              </div>
-              {!isActivated && (
-                <button
-                  type="button"
-                  onClick={() => setActiveSection("activation" as any)}
-                  data-ocid="dashboard.activate_banner.button"
-                  className="px-3 py-0.5 rounded-lg text-[10px] font-bold text-black gold-gradient"
-                >
-                  🔑 Activate Now
-                </button>
-              )}
+                }}
+              />
+              {isAdmin || isActivated ? "ACTIVE" : "NOT ACTIVATED"}
             </div>
-          )}
+            {!isAdmin && !isActivated && (
+              <button
+                type="button"
+                onClick={() => setActiveSection("activation" as any)}
+                data-ocid="dashboard.activate_banner.button"
+                className="px-3 py-0.5 rounded-lg text-[10px] font-bold text-black gold-gradient"
+              >
+                🔑 Activate Now
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -357,6 +359,42 @@ export default function DashboardHome() {
           />
         </div>
         <CardGrid items={dashboardOptions} />
+      </div>
+
+      {/* Start New Journey Banner */}
+      <div
+        className="rounded-2xl px-5 py-4 relative overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #0a1428 0%, #000000 100%)",
+          border: "1px solid rgba(59,130,246,0.25)",
+        }}
+      >
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+          style={{
+            background: "linear-gradient(90deg, #3b82f6, #a855f7, #3b82f6)",
+          }}
+        />
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-white">Start New Journey</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Activate a new fund and begin earning commission
+            </p>
+          </div>
+          <button
+            type="button"
+            data-ocid="dashboard.start_journey.button"
+            onClick={() => setActiveSection("activation" as any)}
+            className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-black"
+            style={{
+              background: "linear-gradient(135deg, #3b82f6, #a855f7)",
+              color: "#fff",
+            }}
+          >
+            🚀 Start
+          </button>
+        </div>
       </div>
 
       {/* Admin Panel Cards */}

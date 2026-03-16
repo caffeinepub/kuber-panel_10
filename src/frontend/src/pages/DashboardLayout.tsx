@@ -181,6 +181,22 @@ export default function DashboardLayout() {
   const CurrentIcon = currentItem?.Icon;
   const loginId = localStorage.getItem("kuber_user_email") || "Kuber User";
 
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(
+    () => localStorage.getItem(`kuber_profile_photo_${loginId}`) || null,
+  );
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      localStorage.setItem(`kuber_profile_photo_${loginId}`, dataUrl);
+      setProfilePhoto(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Detect if admin deactivated user while they're logged in
   const wasDeactivatedByAdmin =
     !isAdmin && userActivation?.deactivatedByAdmin === true;
@@ -218,7 +234,7 @@ export default function DashboardLayout() {
 
       {/* Top bar */}
       <div
-        className="sticky top-[3px] z-30 flex items-center justify-between px-4 py-3 flex-shrink-0"
+        className="sticky top-[3px] z-30 flex items-center justify-between px-4 py-3 flex-shrink-0 relative"
         style={{
           background: "oklch(0.08 0.005 220 / 97%)",
           borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)",
@@ -486,17 +502,26 @@ export default function DashboardLayout() {
                   {loginId.length > 16 ? `${loginId.slice(0, 16)}…` : loginId}
                 </div>
               </div>
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center gold-glow flex-shrink-0"
-                style={{
-                  background: "oklch(0.65 0.2 220 / 15%)",
-                  border: "1px solid oklch(0.65 0.2 220 / 40%)",
-                }}
-              >
-                <span className="text-xs gold-text font-bold">
-                  {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
-                </span>
-              </div>
+              {profilePhoto ? (
+                <img
+                  src={profilePhoto}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                  style={{ border: "1px solid oklch(0.65 0.2 220 / 40%)" }}
+                />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center gold-glow flex-shrink-0"
+                  style={{
+                    background: "oklch(0.65 0.2 220 / 15%)",
+                    border: "1px solid oklch(0.65 0.2 220 / 40%)",
+                  }}
+                >
+                  <span className="text-xs gold-text font-bold">
+                    {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
+                  </span>
+                </div>
+              )}
             </button>
 
             {profileOpen && (
@@ -519,18 +544,44 @@ export default function DashboardLayout() {
                     borderRadius: "14px 14px 0 0",
                   }}
                 >
-                  <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center mb-3 gold-glow"
+                  {profilePhoto ? (
+                    <img
+                      src={profilePhoto}
+                      alt="Profile"
+                      className="w-14 h-14 rounded-full object-cover mb-3"
+                      style={{ border: "2px solid oklch(0.75 0.17 85 / 40%)" }}
+                    />
+                  ) : (
+                    <div
+                      className="w-14 h-14 rounded-full flex items-center justify-center mb-3 gold-glow"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.65 0.2 220 / 30%), oklch(0.75 0.17 85 / 20%))",
+                        border: "2px solid oklch(0.75 0.17 85 / 40%)",
+                      }}
+                    >
+                      <span className="text-2xl font-black gold-text">
+                        {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <label
+                    className="cursor-pointer mt-1 mb-2 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest"
                     style={{
-                      background:
-                        "linear-gradient(135deg, oklch(0.65 0.2 220 / 30%), oklch(0.75 0.17 85 / 20%))",
-                      border: "2px solid oklch(0.75 0.17 85 / 40%)",
+                      background: "oklch(0.65 0.2 220 / 12%)",
+                      border: "1px solid oklch(0.65 0.2 220 / 30%)",
+                      color: "oklch(0.75 0.18 220)",
                     }}
+                    data-ocid="profile.upload_button"
                   >
-                    <span className="text-2xl font-black gold-text">
-                      {isAdmin ? "A" : loginId.slice(0, 1).toUpperCase()}
-                    </span>
-                  </div>
+                    Change Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoChange}
+                    />
+                  </label>
                   <div
                     className="px-3 py-0.5 rounded-full mb-2 text-[10px] font-bold tracking-widest"
                     style={{
