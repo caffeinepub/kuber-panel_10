@@ -1,29 +1,23 @@
 import { ArrowDownCircle, Coins } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
-import type { CommissionLogEntry } from "../../utils/LocalStore";
+import type { CommissionHistoryEntry } from "../../utils/LocalStore";
+
+const fundColors: Record<string, string> = {
+  gaming: "#7c3aed",
+  stock: "#16a34a",
+  mix: "#0d9488",
+  political: "#dc2626",
+};
 
 export default function MyCommission() {
   const { setActiveSection, isAdmin } = useApp();
 
   const adminBalance = LocalStore.getAdminCommission();
-  const adminLog: CommissionLogEntry[] = LocalStore.getAdminCommissionLog();
-
-  const thirtyDaysAgo = new Date(
-    Date.now() - 30 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const recentLog = isAdmin
-    ? adminLog.filter((c) => c.date > thirtyDaysAgo).slice(0, 100)
-    : [];
+  const commissionHistory: CommissionHistoryEntry[] =
+    LocalStore.getCommissionHistory();
 
   const displayBalance = isAdmin ? adminBalance : 0;
-
-  const fundColors: Record<string, string> = {
-    gaming: "oklch(0.6 0.2 280)",
-    stock: "oklch(0.7 0.2 145)",
-    mix: "oklch(0.75 0.15 85)",
-    political: "oklch(0.6 0.2 25)",
-  };
 
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN");
   const fmtTime = (iso: string) =>
@@ -55,11 +49,6 @@ export default function MyCommission() {
                 minimumFractionDigits: 2,
               })}
             </div>
-            {isAdmin && (
-              <div className="text-xs text-gray-500 mt-1">
-                15% commission from live fund transactions
-              </div>
-            )}
           </div>
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center"
@@ -79,86 +68,90 @@ export default function MyCommission() {
         </button>
       </div>
 
-      <div className="dark-card rounded-xl overflow-hidden">
+      {/* Commission History */}
+      <div className="space-y-3">
         <div
-          className="px-4 py-3"
-          style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
+          className="px-4 py-3 rounded-t-xl"
+          style={{
+            background: "rgba(212, 160, 23, 0.1)",
+            borderBottom: "1px solid rgba(212,160,23,0.2)",
+          }}
         >
           <span className="text-sm font-bold gold-text">
-            COMMISSION HISTORY (30 DAYS)
+            COMMISSION HISTORY
           </span>
         </div>
-        <table className="w-full" data-ocid="commission.table">
-          <thead>
-            <tr style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}>
-              {[
-                "Date",
-                "Time",
-                "Bank Name",
-                "Account Number",
-                "Fund Type",
-                "Commission (₹)",
-              ].map((h) => (
-                <th
-                  key={h}
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {recentLog.length === 0 ? (
-              <tr data-ocid="commission.empty_state">
-                <td colSpan={6} className="text-center py-10 text-gray-600">
-                  {isAdmin
-                    ? "No commission yet. Turn ON Live Fund Activity to start."
-                    : "Commission data not available"}
-                </td>
-              </tr>
-            ) : (
-              recentLog.map((c, i) => (
-                <tr
-                  key={c.id}
-                  data-ocid={`commission.item.${i + 1}`}
-                  className="table-row-hover"
-                  style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)" }}
-                >
-                  <td className="px-4 py-3 text-xs text-gray-300">
-                    {fmtDate(c.date)}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-400">
-                    {fmtTime(c.date)}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-white font-medium">
-                    {c.bankName}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-400">
-                    {c.accountNumber}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="px-2 py-0.5 rounded-full text-xs font-bold uppercase"
-                      style={{
-                        color: fundColors[c.fundType] || "oklch(0.75 0.15 85)",
-                        background: "oklch(0.75 0.15 85 / 10%)",
-                      }}
-                    >
-                      {c.fundType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-black gold-text">
-                    +₹
-                    {c.amount.toLocaleString("en-IN", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+
+        {!isAdmin ? (
+          <div
+            data-ocid="commission.empty_state"
+            className="dark-card rounded-xl p-10 text-center"
+          >
+            <p className="text-gray-600 text-sm">
+              Commission data not available
+            </p>
+          </div>
+        ) : commissionHistory.length === 0 ? (
+          <div
+            data-ocid="commission.empty_state"
+            className="dark-card rounded-xl p-10 text-center"
+          >
+            <Coins className="w-10 h-10 mx-auto mb-3 text-gray-700" />
+            <p className="text-gray-600 text-sm">
+              No commission yet. Turn ON a fund and turn it OFF to see the
+              summary.
+            </p>
+          </div>
+        ) : (
+          commissionHistory.map((entry, i) => {
+            const color = fundColors[entry.fundType] ?? "#d4a017";
+            return (
+              <div
+                key={entry.id}
+                data-ocid={`commission.item.${i + 1}`}
+                className="rounded-xl p-4"
+                style={{
+                  background: `${color}0a`,
+                  border: `1px solid ${color}25`,
+                }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span
+                        className="text-xs font-black uppercase px-2 py-0.5 rounded-full"
+                        style={{ background: `${color}18`, color }}
+                      >
+                        {entry.fundLabel} Fund
+                      </span>
+                    </div>
+                    <div className="text-sm font-bold text-white mb-0.5">
+                      {entry.bankName}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Acc: {entry.accountNumber}
+                    </div>
+                    <div className="text-[10px] text-gray-600 mt-1">
+                      {fmtDate(entry.startTime)} {fmtTime(entry.startTime)} →{" "}
+                      {fmtDate(entry.endTime)} {fmtTime(entry.endTime)}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xl font-black gold-text">
+                      +₹
+                      {entry.totalCommission.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      Commission earned
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

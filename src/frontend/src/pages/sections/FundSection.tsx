@@ -1,5 +1,7 @@
-import { KeyRound, Lock, Power, PowerOff } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { COMMISSION_RATES } from "../../context/AppContext";
+import * as LocalStore from "../../utils/LocalStore";
 
 interface Props {
   fundType: "gaming" | "stock" | "mix" | "political";
@@ -7,10 +9,10 @@ interface Props {
 }
 
 const fundColors: Record<string, string> = {
-  gaming: "oklch(0.6 0.2 280)",
-  stock: "oklch(0.7 0.2 145)",
-  mix: "oklch(0.75 0.15 85)",
-  political: "oklch(0.6 0.2 25)",
+  gaming: "#7c3aed",
+  stock: "#16a34a",
+  mix: "#0d9488",
+  political: "#dc2626",
 };
 
 const fundLabels: Record<string, string> = {
@@ -34,16 +36,19 @@ export default function FundSection({ fundType, commission }: Props) {
   const approvedBanks = bankAccounts.filter((b) => b.status === "approved");
   const color = fundColors[fundType];
   const fundLabel = fundLabels[fundType];
+  const commRate = COMMISSION_RATES[fundType] ?? commission / 100;
 
-  // Check if this specific fund is activated
   const isFundUnlocked = isAdmin || isFundActive(fundType);
 
   const handleToggle = (bankId: string) => {
     const existing = activeFundSessions[bankId];
     if (existing && existing.fundType === fundType) {
+      // Turn OFF - this will log commission history in clearFundSession
       clearFundSession(bankId);
     } else {
+      // Turn ON
       const sessionId = `session_${Date.now()}`;
+      LocalStore.setSessionStartTime(bankId, new Date().toISOString());
       setActiveFundSession(bankId, sessionId, fundType);
     }
   };
@@ -51,8 +56,9 @@ export default function FundSection({ fundType, commission }: Props) {
   if (!isFundUnlocked) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold" style={{ color }}>
-          {fundLabel} Fund ({commission}% Commission)
+        <h2 className="text-2xl font-black text-white">
+          {fundLabel} Fund -{" "}
+          <span style={{ color }}>{commission}% Commission</span>
         </h2>
         <div className="dark-card rounded-xl p-12 text-center space-y-4">
           <div
@@ -62,7 +68,7 @@ export default function FundSection({ fundType, commission }: Props) {
               border: "1px solid oklch(0.75 0.15 85 / 25%)",
             }}
           >
-            <Lock className="w-8 h-8 gold-text" />
+            <KeyRound className="w-8 h-8 gold-text" />
           </div>
           <div>
             <h3 className="text-lg font-bold text-white mb-1">
@@ -70,10 +76,7 @@ export default function FundSection({ fundType, commission }: Props) {
             </h3>
             <p className="text-gray-500 text-sm">
               This fund requires a{" "}
-              <span
-                className="font-bold"
-                style={{ color: "oklch(0.8 0.17 85)" }}
-              >
+              <span className="font-bold" style={{ color: "#d4a017" }}>
                 {fundLabel} Fund activation code
               </span>
               .
@@ -98,124 +101,173 @@ export default function FundSection({ fundType, commission }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold" style={{ color }}>
-            {fundLabel} Fund
-          </h2>
-          <p
-            className="text-sm mt-0.5"
-            style={{ color: "oklch(0.75 0.15 85)" }}
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-black text-white leading-tight">
+          {fundLabel} Fund -{" "}
+          <span style={{ color }}>{commission}% Commission</span>
+        </h2>
+        <p className="text-sm text-gray-400 mt-1">
+          Manage your fund activation and view earnings
+        </p>
+        <div className="flex items-center gap-3 mt-3 flex-wrap">
+          <span
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+            style={{
+              background: "rgba(22,163,74,0.15)",
+              border: "1px solid rgba(22,163,74,0.3)",
+              color: "#4ade80",
+            }}
           >
-            {commission}% Commission on all transactions
-          </p>
-        </div>
-        <div
-          className="px-3 py-1 rounded-full text-xs font-bold"
-          style={{
-            background: `${color} / 12%`,
-            color,
-            border: `1px solid ${color} / 25%`,
-          }}
-        >
-          ACTIVATED
+            ✓ ACTIVATED
+          </span>
+          <span
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+            style={{
+              background: "rgba(180,131,9,0.15)",
+              border: "1px solid rgba(180,131,9,0.3)",
+              color: "#d4a017",
+            }}
+          >
+            {commission}% Commission
+          </span>
         </div>
       </div>
 
-      {approvedBanks.length === 0 && (
-        <div
-          data-ocid={`${fundType}_fund.empty_state`}
-          className="dark-card rounded-xl p-10 text-center"
+      {/* Linked Bank Accounts */}
+      <div>
+        <p
+          className="text-xs font-bold uppercase tracking-widest mb-3"
+          style={{ color: "#d4a017" }}
         >
-          <p className="text-gray-500">
-            No approved bank accounts. Add and get a bank approved first.
-          </p>
-        </div>
-      )}
+          Linked Bank Accounts
+        </p>
 
-      <div className="space-y-3">
-        {approvedBanks.map((bank, i) => {
-          const isOn = activeFundSessions[bank.id]?.fundType === fundType;
-          return (
-            <div
-              key={bank.id}
-              data-ocid={`${fundType}_fund.item.${i + 1}`}
-              className="dark-card rounded-xl p-5"
-              style={{ border: isOn ? `1px solid ${color} / 30%` : undefined }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{
-                      background: `${color} / 12%`,
-                      border: `1px solid ${color} / 25%`,
-                    }}
-                  >
-                    <span className="text-xl font-black" style={{ color }}>
-                      {bank.bankName[0]}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="font-bold text-white">{bank.bankName}</div>
-                    <div className="text-xs text-gray-500">
-                      {bank.accountHolderName}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      {bank.accountNumber} • {bank.ifscCode}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {isOn && (
-                    <div className="flex items-center gap-1.5">
-                      <div className="live-dot" />
+        {approvedBanks.length === 0 && (
+          <div
+            data-ocid={`${fundType}_fund.empty_state`}
+            className="dark-card rounded-xl p-10 text-center"
+          >
+            <p className="text-gray-500 text-sm">
+              No approved bank accounts. Add and get a bank approved first.
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {approvedBanks.map((bank, i) => {
+            const isOn = activeFundSessions[bank.id]?.fundType === fundType;
+
+            return (
+              <div
+                key={bank.id}
+                data-ocid={`${fundType}_fund.item.${i + 1}`}
+                className="rounded-xl p-4"
+                style={{
+                  background: "#0d0d0d",
+                  border: isOn ? `1px solid ${color}50` : "1px solid #222",
+                }}
+              >
+                {/* Bank Name + Approved + Toggle */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-black text-white text-sm uppercase">
+                        {bank.bankName}
+                      </span>
                       <span
-                        className="text-xs font-bold"
-                        style={{ color: "oklch(0.7 0.2 145)" }}
+                        className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                        style={{
+                          background: "rgba(22,163,74,0.15)",
+                          border: "1px solid rgba(22,163,74,0.35)",
+                          color: "#4ade80",
+                        }}
                       >
-                        LIVE
+                        APPROVED
                       </span>
                     </div>
-                  )}
+                    <div className="text-sm text-gray-300 font-medium mb-2">
+                      {bank.accountHolderName}
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-gray-500">
+                        Account: {bank.accountNumber} | IFSC: {bank.ifscCode}
+                      </p>
+                      {bank.upiId && (
+                        <p className="text-xs text-gray-500">
+                          UPI: {bank.upiId}
+                        </p>
+                      )}
+                      {bank.mobileNumber && (
+                        <p className="text-xs text-gray-500">
+                          Mobile: {bank.mobileNumber}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Slider Toggle */}
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={isOn}
                     onClick={() => handleToggle(bank.id)}
                     data-ocid={`${fundType}_fund.toggle.${i + 1}`}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                    className="flex-shrink-0 relative transition-all duration-300"
                     style={{
-                      background: isOn
-                        ? "oklch(0.5 0.2 25 / 15%)"
-                        : `${color} / 15%`,
-                      border: isOn
-                        ? "1px solid oklch(0.5 0.2 25 / 30%)"
-                        : `1px solid ${color} / 30%`,
-                      color: isOn ? "oklch(0.7 0.2 25)" : color,
+                      width: 52,
+                      height: 28,
+                      borderRadius: 14,
+                      background: isOn ? color : "#333",
+                      border: isOn ? `1px solid ${color}` : "1px solid #444",
+                      cursor: "pointer",
+                      outline: "none",
+                      marginTop: 2,
                     }}
                   >
-                    {isOn ? (
-                      <PowerOff className="w-3.5 h-3.5" />
-                    ) : (
-                      <Power className="w-3.5 h-3.5" />
-                    )}
-                    {isOn ? "Turn OFF" : "Turn ON"}
+                    <span
+                      className="absolute top-0.5 transition-all duration-300"
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        left: isOn ? "26px" : "3px",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                        display: "block",
+                      }}
+                    />
                   </button>
                 </div>
-              </div>
-              {isOn && (
+
+                {/* Separator */}
                 <div
-                  className="mt-3 pt-3 flex items-center gap-2 text-xs text-gray-500"
-                  style={{ borderTop: `1px solid ${color} / 10%` }}
+                  className="mt-3 pt-3"
+                  style={{ borderTop: `1px solid ${color}15` }}
                 >
-                  <div className="live-dot" />
-                  <span>
-                    Transactions active • {commission}% commission accumulating
-                  </span>
+                  <div
+                    className="text-xs font-medium"
+                    style={{ color: isOn ? color : "#555" }}
+                  >
+                    {isOn ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="live-dot inline-block" />
+                        {fundLabel} Fund is ON
+                      </span>
+                    ) : (
+                      `${fundLabel} Fund is OFF`
+                    )}
+                  </div>
+                  {isOn && (
+                    <div className="text-[10px] text-gray-600 mt-0.5">
+                      {Math.round(commRate * 100)}% commission accumulating
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

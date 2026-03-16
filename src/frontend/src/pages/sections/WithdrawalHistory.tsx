@@ -3,35 +3,180 @@ import { useState } from "react";
 import type { WithdrawalData } from "../../backend";
 import { useApp } from "../../context/AppContext";
 
+function getBranchNameFromIFSC(ifsc: string): string {
+  if (!ifsc || ifsc.length < 6) return ifsc || "";
+  const bankPrefix = ifsc.slice(0, 4).toUpperCase();
+  const branchCode = ifsc.slice(5).toUpperCase();
+
+  const bankMap: Record<string, string> = {
+    SBIN: "State Bank of India",
+    HDFC: "HDFC Bank",
+    ICIC: "ICICI Bank",
+    PUNB: "Punjab National Bank",
+    UTIB: "Axis Bank",
+    KKBK: "Kotak Mahindra Bank",
+    BARB: "Bank of Baroda",
+    CNRB: "Canara Bank",
+    UBIN: "Union Bank of India",
+    IOBA: "Indian Overseas Bank",
+    BKID: "Bank of India",
+    IDBI: "IDBI Bank",
+    YESB: "Yes Bank",
+    INDB: "IndusInd Bank",
+    MAHB: "Bank of Maharashtra",
+    ALLA: "Allahabad Bank",
+    ANDB: "Andhra Bank",
+    CORP: "Corporation Bank",
+    FDRL: "Federal Bank",
+    KARB: "Karnataka Bank",
+  };
+
+  const cityMap: Record<string, string> = {
+    "0000": "Main Branch",
+    "0001": "New Delhi",
+    "0002": "Mumbai",
+    "0003": "Kolkata",
+    "0004": "Chennai",
+    "0005": "Bangalore",
+    "0006": "Hyderabad",
+    "0007": "Ahmedabad",
+    "0008": "Pune",
+    "0009": "Jaipur",
+    "0010": "Lucknow",
+    "0011": "Surat",
+    MUM: "Mumbai",
+    DEL: "New Delhi",
+    BNG: "Bangalore",
+    CHN: "Chennai",
+    HYD: "Hyderabad",
+    KOL: "Kolkata",
+    AHM: "Ahmedabad",
+    PUN: "Pune",
+    JAI: "Jaipur",
+    LKN: "Lucknow",
+    SRT: "Surat",
+    NAG: "Nagpur",
+    IND: "Indore",
+    BHO: "Bhopal",
+    PAT: "Patna",
+    CHD: "Chandigarh",
+  };
+
+  const bankName = bankMap[bankPrefix] ?? `${bankPrefix} Bank`;
+
+  let city = "";
+  for (const [code, cityName] of Object.entries(cityMap)) {
+    if (branchCode.startsWith(code)) {
+      city = cityName;
+      break;
+    }
+  }
+  if (!city && branchCode.length > 0) {
+    city = `${branchCode.slice(0, 3)} Branch`;
+  }
+
+  return city ? `${bankName}, ${city}` : bankName;
+}
+
+function buildReceiptRows(
+  w: WithdrawalData,
+  d: Record<string, string>,
+  fmtDate: string,
+  fmtTime: string,
+): Array<[string, string]> {
+  const cleanId = w.id.replace(/-/g, "").toUpperCase();
+  const utr12 = cleanId.slice(0, 12);
+  const txnId = `TXN${cleanId.slice(0, 16)}`;
+  const numericPart = w.id.replace(/[^0-9]/g, "").padEnd(16, "0");
+  const rrn12 = numericPart.slice(0, 12);
+  const rrn16 = numericPart.slice(0, 16).padEnd(16, "0");
+  const upiRef = numericPart.slice(2, 14);
+
+  const maskedAcc = d.accountNumber
+    ? `${"X".repeat(Math.max(0, d.accountNumber.length - 4))}${d.accountNumber.slice(-4)}`
+    : "XXXXXXXXXX";
+  const branchName = getBranchNameFromIFSC(d.ifsc || "");
+  const transferMode = d.transferMode || w.method.toUpperCase();
+  const amount = `₹${w.amount.toLocaleString("en-IN")}`;
+  const status = w.status.toUpperCase();
+
+  const method = w.method?.toLowerCase();
+
+  if (method === "upi") {
+    return [
+      ["UTR Number", utr12],
+      ["Transaction ID", txnId],
+      ["UPI Ref No", upiRef],
+      ["VPA / UPI ID", d.upiId || d.upiAddress || "---"],
+      ["Amount", amount],
+      ["Date", fmtDate],
+      ["Time", fmtTime],
+      ["Status", status],
+    ];
+  }
+
+  if (method === "usdt") {
+    return [
+      ["UTR Number", utr12],
+      ["Transaction ID", txnId],
+      ["TXN Hash", cleanId.slice(0, 32)],
+      ["Network", "TRC20"],
+      ["Wallet Address", d.usdtAddress || "---"],
+      ["Amount", amount],
+      ["Date", fmtDate],
+      ["Time", fmtTime],
+      ["Status", status],
+    ];
+  }
+
+  // Bank transfer — IMPS / NEFT / RTGS
+  const isIMPS = transferMode === "IMPS";
+  const rrnLabel = isIMPS ? "RRN / IMPS Ref No" : "RRN Number";
+  const rrnValue = isIMPS ? rrn12 : rrn16;
+
+  return [
+    ["UTR Number", utr12],
+    ["Transaction ID", txnId],
+    [rrnLabel, rrnValue],
+    ["Account Number", maskedAcc],
+    ["IFSC Code", d.ifsc || "---"],
+    ["Account Holder", d.accountHolderName || d.accountHolder || "---"],
+    ["Bank Name", d.bankName || "---"],
+    ["Branch Name", branchName],
+    ["Transfer Mode", transferMode],
+    ["Amount", amount],
+    ["Date", fmtDate],
+    ["Time", fmtTime],
+    ["Status", status],
+  ];
+}
+
 function generateReceiptHTML(
   w: WithdrawalData,
-  details: Record<string, string>,
+  d: Record<string, string>,
   fmtDate: string,
   fmtTime: string,
 ) {
-  const utr = `UTR${w.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`;
-  const txnId = `TXN${w.id.replace(/-/g, "").slice(0, 16).toUpperCase()}`;
-  const last4 = details.accountNumber
-    ? details.accountNumber
-        .slice(-4)
-        .padStart(details.accountNumber.length, "X")
-    : "XXXXXXXX";
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Transaction Receipt</title>
-<style>body{font-family:Arial,sans-serif;max-width:400px;margin:40px auto;padding:20px;border:1px solid #ccc;border-radius:8px;}
-h2{text-align:center;color:#1a56db;} .badge{text-align:center;background:#dcfce7;color:#16a34a;padding:4px 12px;border-radius:20px;display:inline-block;font-weight:bold;margin:8px auto;display:block;width:fit-content;} .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;} .label{color:#6b7280;} .val{font-weight:600;} .footer{text-align:center;color:#9ca3af;font-size:11px;margin-top:16px;}
+  const rows = buildReceiptRows(w, d, fmtDate, fmtTime);
+  const rowsHTML = rows
+    .map(
+      ([k, v]) =>
+        `<div class="row"><span class="label">${k}</span><span class="val" style="${
+          k === "Status"
+            ? "color:#16a34a"
+            : k === "Amount"
+              ? "color:#d4a017"
+              : ""
+        }">${v}</span></div>`,
+    )
+    .join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Transaction Receipt — KUBER PANEL</title>
+<style>body{font-family:Arial,sans-serif;max-width:420px;margin:40px auto;padding:24px;background:#0a0f1e;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:12px;}
+h2{text-align:center;color:#60a5fa;letter-spacing:4px;margin-bottom:4px;} .sub{text-align:center;color:#64748b;font-size:12px;margin-bottom:12px;} .badge{text-align:center;background:rgba(22,163,74,0.15);color:#4ade80;padding:4px 16px;border-radius:20px;display:inline-block;font-weight:bold;margin:8px auto 16px;border:1px solid rgba(22,163,74,0.35);width:fit-content;display:block;} .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;} .label{color:#64748b;} .val{font-weight:600;font-family:monospace;text-align:right;max-width:58%;word-break:break-all;} .footer{text-align:center;color:#374151;font-size:10px;margin-top:16px;}
 </style></head><body>
-<h2>KUBER PANEL</h2><p class="badge">✓ SUCCESS</p>
-<div class="row"><span class="label">UTR Number</span><span class="val">${utr}</span></div>
-<div class="row"><span class="label">Transaction ID</span><span class="val">${txnId}</span></div>
-<div class="row"><span class="label">Account Number</span><span class="val">${last4}</span></div>
-<div class="row"><span class="label">IFSC Code</span><span class="val">${details.ifsc || "KUBER0001234"}</span></div>
-<div class="row"><span class="label">Account Holder</span><span class="val">${details.accountHolder || "Account Holder"}</span></div>
-<div class="row"><span class="label">Bank Name</span><span class="val">${details.bankName || "KUBER BANK"}</span></div>
-<div class="row"><span class="label">Amount</span><span class="val">₹${w.amount.toLocaleString("en-IN")}</span></div>
-<div class="row"><span class="label">Date</span><span class="val">${fmtDate}</span></div>
-<div class="row"><span class="label">Time</span><span class="val">${fmtTime}</span></div>
-<div class="row"><span class="label">Transfer Mode</span><span class="val">${details.transferMode || w.method.toUpperCase()}</span></div>
-<div class="row"><span class="label">Status</span><span class="val" style="color:#16a34a">${w.status.toUpperCase()}</span></div>
+<h2>KUBER PANEL</h2><p class="sub">Transaction Receipt</p><p class="badge">✓ SUCCESS</p>
+${rowsHTML}
 <div class="footer">This is a computer-generated receipt. KUBER PANEL Official Platform.</div>
 </body></html>`;
 }
@@ -179,25 +324,23 @@ export default function WithdrawalHistory() {
         </table>
       </div>
 
+      {/* Full-screen Receipt Modal */}
       {selected && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "oklch(0 0 0 / 85%)" }}
+          className="fixed inset-0 z-50"
+          style={{ background: "#000000" }}
           data-ocid="withdrawal_history.dialog"
         >
           <div
-            className="w-full max-w-sm rounded-2xl overflow-hidden"
-            style={{
-              background: "oklch(0.09 0.008 220)",
-              border: "1px solid oklch(0.65 0.2 220 / 35%)",
-            }}
+            className="w-full h-full flex flex-col"
+            style={{ background: "oklch(0.07 0.008 220)" }}
           >
             {/* Receipt header */}
             <div
-              className="px-5 py-4 flex items-center justify-between"
+              className="px-5 py-4 flex items-center justify-between flex-shrink-0"
               style={{
                 background:
-                  "linear-gradient(135deg, oklch(0.12 0.02 220), oklch(0.1 0.01 220))",
+                  "linear-gradient(135deg, oklch(0.12 0.02 220), oklch(0.10 0.01 220))",
                 borderBottom: "1px solid oklch(0.65 0.2 220 / 20%)",
               }}
             >
@@ -220,6 +363,8 @@ export default function WithdrawalHistory() {
                 type="button"
                 onClick={() => setSelected(null)}
                 data-ocid="withdrawal_history.close_button"
+                className="p-2 rounded-full"
+                style={{ background: "rgba(255,255,255,0.06)" }}
               >
                 <X className="w-5 h-5 text-gray-400" />
               </button>
@@ -227,11 +372,11 @@ export default function WithdrawalHistory() {
 
             {/* Success badge */}
             <div
-              className="text-center py-3"
+              className="text-center py-3 flex-shrink-0"
               style={{ borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)" }}
             >
               <span
-                className="px-4 py-1.5 rounded-full text-xs font-black tracking-widest"
+                className="px-5 py-1.5 rounded-full text-xs font-black tracking-widest"
                 style={{
                   background: "oklch(0.62 0.2 145 / 20%)",
                   color: "oklch(0.72 0.2 145)",
@@ -242,45 +387,29 @@ export default function WithdrawalHistory() {
               </span>
             </div>
 
-            {/* Receipt rows */}
-            <div className="px-5 py-3 space-y-0">
+            {/* Receipt rows — scrollable, fills remaining height */}
+            <div className="flex-1 overflow-y-auto px-5 py-2">
               {(() => {
                 const d = parseDetails(selected.methodDetails);
-                const utr = `UTR${selected.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`;
-                const txnId = `TXN${selected.id.replace(/-/g, "").slice(0, 16).toUpperCase()}`;
-                const maskedAcc = d.accountNumber
-                  ? `${"X".repeat(Math.max(0, d.accountNumber.length - 4))}${d.accountNumber.slice(-4)}`
-                  : "XXXXXXXXXX";
-                const rows = [
-                  ["UTR Number", utr],
-                  ["Transaction ID", txnId],
-                  ["Account Number", maskedAcc],
-                  ["IFSC Code", d.ifsc || "KUBER0001234"],
-                  [
-                    "Account Holder",
-                    d.accountHolderName || d.accountHolder || "Account Holder",
-                  ],
-                  ["Bank Name", d.bankName || "KUBER BANK"],
-                  [
-                    "Transfer Mode",
-                    d.transferMode || selected.method.toUpperCase(),
-                  ],
-                  ["Amount", `₹${selected.amount.toLocaleString("en-IN")}`],
-                  ["Date", fmtDate(selected.createdAt)],
-                  ["Time", fmtTime(selected.createdAt)],
-                  ["Status", selected.status.toUpperCase()],
-                ];
+                const rows = buildReceiptRows(
+                  selected,
+                  d,
+                  fmtDate(selected.createdAt),
+                  fmtTime(selected.createdAt),
+                );
                 return rows.map(([k, v]) => (
                   <div
                     key={k}
-                    className="flex justify-between py-2"
+                    className="flex justify-between py-3"
                     style={{
                       borderBottom: "1px solid oklch(0.65 0.2 220 / 8%)",
                     }}
                   >
-                    <span className="text-[11px] text-gray-500">{k}</span>
+                    <span className="text-[12px] text-gray-500 flex-shrink-0 mr-4">
+                      {k}
+                    </span>
                     <span
-                      className="text-[11px] font-semibold"
+                      className="text-[12px] font-semibold font-mono text-right break-all"
                       style={{
                         color:
                           k === "Status"
@@ -299,42 +428,42 @@ export default function WithdrawalHistory() {
 
             {/* Footer buttons */}
             <div
-              className="px-5 py-4 flex gap-2"
+              className="px-5 py-4 flex gap-2 flex-shrink-0"
               style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 15%)" }}
             >
               <button
                 type="button"
                 onClick={handlePrint}
                 data-ocid="withdrawal_history.print_button"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-black gold-gradient"
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold text-black gold-gradient"
               >
-                <Printer className="w-3.5 h-3.5" /> Print
+                <Printer className="w-4 h-4" /> Print
               </button>
               <button
                 type="button"
                 onClick={() => handleOpen(selected)}
                 data-ocid="withdrawal_history.open_button"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-semibold"
                 style={{
                   background: "oklch(0.65 0.2 220 / 15%)",
                   color: "oklch(0.75 0.18 220)",
                   border: "1px solid oklch(0.65 0.2 220 / 25%)",
                 }}
               >
-                <ExternalLink className="w-3.5 h-3.5" /> Open
+                <ExternalLink className="w-4 h-4" /> Open
               </button>
               <button
                 type="button"
                 onClick={() => handleDownload(selected)}
                 data-ocid="withdrawal_history.download_button"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-semibold"
                 style={{
                   background: "oklch(0.14 0 0)",
                   color: "oklch(0.65 0 0)",
                   border: "1px solid oklch(0.75 0.15 85 / 15%)",
                 }}
               >
-                <Download className="w-3.5 h-3.5" /> Download
+                <Download className="w-4 h-4" /> Download
               </button>
             </div>
           </div>

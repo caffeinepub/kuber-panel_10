@@ -20,7 +20,6 @@ import { useApp } from "../../context/AppContext";
 
 const LOGO = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
 
-// Sections requiring ANY fund activation
 const GENERAL_ACTIVATION_REQUIRED = new Set([
   "add-bank",
   "bank-statement",
@@ -30,7 +29,6 @@ const GENERAL_ACTIVATION_REQUIRED = new Set([
   "withdrawal-history",
 ]);
 
-// Sections requiring SPECIFIC fund activation
 const FUND_SPECIFIC: Record<string, string> = {
   "gaming-fund": "gaming",
   "stock-fund": "stock",
@@ -55,108 +53,108 @@ export default function DashboardHome() {
       label: "Add Bank Account",
       desc: "Link your bank securely",
       Icon: Building2,
-      gradient:
-        "linear-gradient(135deg, #0f2460 0%, #1a4db8 50%, #2563eb 100%)",
-      glow: "#2563eb",
+      bg: "#0a1428",
+      accent: "#3b82f6",
+      iconBg: "rgba(59,130,246,0.12)",
     },
     {
       id: "bank-statement",
       label: "Bank Statement",
       desc: "Transaction history",
       Icon: FileText,
-      gradient:
-        "linear-gradient(135deg, #064e3b 0%, #047857 50%, #059669 100%)",
-      glow: "#059669",
+      bg: "#081a12",
+      accent: "#22c55e",
+      iconBg: "rgba(34,197,94,0.12)",
     },
     {
       id: "gaming-fund",
       label: "Gaming Fund",
       desc: "15% commission",
       Icon: Gamepad2,
-      gradient:
-        "linear-gradient(135deg, #3b0764 0%, #6d28d9 50%, #7c3aed 100%)",
-      glow: "#7c3aed",
+      bg: "#110d24",
+      accent: "#a855f7",
+      iconBg: "rgba(168,85,247,0.12)",
     },
     {
       id: "stock-fund",
       label: "Stock Fund",
       desc: "30% commission",
       Icon: TrendingUp,
-      gradient:
-        "linear-gradient(135deg, #052e16 0%, #15803d 50%, #16a34a 100%)",
-      glow: "#16a34a",
+      bg: "#091a0e",
+      accent: "#16a34a",
+      iconBg: "rgba(22,163,74,0.12)",
     },
     {
       id: "political-fund",
       label: "Political Fund",
       desc: "25% commission",
       Icon: Vote,
-      gradient:
-        "linear-gradient(135deg, #450a0a 0%, #b91c1c 50%, #dc2626 100%)",
-      glow: "#dc2626",
+      bg: "#1a0808",
+      accent: "#ef4444",
+      iconBg: "rgba(239,68,68,0.12)",
     },
     {
       id: "mix-fund",
       label: "Mix Fund",
       desc: "30% commission",
       Icon: Shuffle,
-      gradient:
-        "linear-gradient(135deg, #042f2e 0%, #0d9488 50%, #14b8a6 100%)",
-      glow: "#14b8a6",
+      bg: "#0a1220",
+      accent: "#06b6d4",
+      iconBg: "rgba(6,182,212,0.12)",
     },
     {
       id: "commission",
       label: "My Commission",
       desc: "Track earnings",
       Icon: Coins,
-      gradient:
-        "linear-gradient(135deg, #451a03 0%, #c2410c 50%, #ea580c 100%)",
-      glow: "#ea580c",
+      bg: "#1a1208",
+      accent: "#f59e0b",
+      iconBg: "rgba(245,158,11,0.12)",
     },
     {
       id: "live-activity",
       label: "Live Fund Activity",
       desc: "Real-time updates",
       Icon: Activity,
-      gradient:
-        "linear-gradient(135deg, #0c1445 0%, #1e40af 50%, #3b82f6 100%)",
-      glow: "#3b82f6",
+      bg: "#08121a",
+      accent: "#38bdf8",
+      iconBg: "rgba(56,189,248,0.12)",
     },
     {
       id: "withdrawal",
       label: "Withdrawal",
       desc: "IMPS / NEFT / RTGS",
       Icon: ArrowDownCircle,
-      gradient:
-        "linear-gradient(135deg, #1a1045 0%, #6d28d9 50%, #8b5cf6 100%)",
-      glow: "#8b5cf6",
+      bg: "#120d1a",
+      accent: "#8b5cf6",
+      iconBg: "rgba(139,92,246,0.12)",
     },
     {
       id: "withdrawal-history",
       label: "Withdrawal History",
       desc: "Past transactions",
       Icon: History,
-      gradient:
-        "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)",
-      glow: "#1d4ed8",
+      bg: "#080e1a",
+      accent: "#60a5fa",
+      iconBg: "rgba(96,165,250,0.12)",
     },
     {
       id: "activation",
       label: "Activation Panel",
       desc: "Unlock fund options",
       Icon: KeyRound,
-      gradient:
-        "linear-gradient(135deg, #1c1917 0%, #78350f 50%, #d97706 100%)",
-      glow: "#d97706",
+      bg: "#1a1408",
+      accent: "#eab308",
+      iconBg: "rgba(234,179,8,0.12)",
     },
     {
       id: "help-support",
       label: "Help Support",
       desc: "Telegram support",
       Icon: HelpCircle,
-      gradient:
-        "linear-gradient(135deg, #0f2060 0%, #0369a1 50%, #0284c7 100%)",
-      glow: "#0284c7",
+      bg: "#080f1a",
+      accent: "#0ea5e9",
+      iconBg: "rgba(14,165,233,0.12)",
     },
   ];
 
@@ -166,42 +164,42 @@ export default function DashboardHome() {
       label: "Generated Codes",
       desc: "Create & manage codes",
       Icon: Code2,
-      gradient:
-        "linear-gradient(135deg, #0f2460 0%, #1d4ed8 50%, #2563eb 100%)",
-      glow: "#2563eb",
+      bg: "#080e1a",
+      accent: "#60a5fa",
+      iconBg: "rgba(96,165,250,0.12)",
     },
     {
       id: "user-management",
       label: "User Management",
       desc: "View all users",
       Icon: Users,
-      gradient:
-        "linear-gradient(135deg, #052e16 0%, #15803d 50%, #22c55e 100%)",
-      glow: "#22c55e",
+      bg: "#081a0e",
+      accent: "#4ade80",
+      iconBg: "rgba(74,222,128,0.12)",
     },
     {
       id: "bank-approval",
       label: "Bank Approval",
       desc: "Approve accounts",
       Icon: CheckSquare,
-      gradient:
-        "linear-gradient(135deg, #451a03 0%, #b45309 50%, #f59e0b 100%)",
-      glow: "#f59e0b",
+      bg: "#1a1208",
+      accent: "#fbbf24",
+      iconBg: "rgba(251,191,36,0.12)",
     },
     {
       id: "change-support",
       label: "Change Support Link",
       desc: "Update Telegram link",
       Icon: Code2,
-      gradient:
-        "linear-gradient(135deg, #3b0764 0%, #7e22ce 50%, #a855f7 100%)",
-      glow: "#a855f7",
+      bg: "#110d24",
+      accent: "#c084fc",
+      iconBg: "rgba(192,132,252,0.12)",
     },
   ];
 
   const CardGrid = ({ items }: { items: typeof dashboardOptions }) => (
     <div className="grid grid-cols-2 gap-3">
-      {items.map(({ id, label, desc, Icon, gradient, glow }) => {
+      {items.map(({ id, label, desc, Icon, bg, accent, iconBg }) => {
         const locked = isCardLocked(id);
         return (
           <button
@@ -211,48 +209,44 @@ export default function DashboardHome() {
             data-ocid={`dashboard.${id.replace(/-/g, "_")}.button`}
             className="relative flex flex-col p-4 rounded-2xl text-left transition-all duration-200 active:scale-95 overflow-hidden"
             style={{
-              background: gradient,
+              background: locked
+                ? "#0a0a0a"
+                : `linear-gradient(145deg, ${bg} 0%, #000000 100%)`,
               minHeight: "118px",
+              border: locked ? "1px solid #1a1a1a" : `1px solid ${accent}28`,
               boxShadow: locked
-                ? "0 4px 12px rgba(0,0,0,0.5)"
-                : `0 4px 20px ${glow}40, 0 2px 8px rgba(0,0,0,0.4)`,
-              opacity: locked ? 0.6 : 1,
+                ? "0 2px 8px rgba(0,0,0,0.8)"
+                : `0 2px 12px rgba(0,0,0,0.7), 0 0 0 0 ${accent}00`,
+              opacity: locked ? 0.5 : 1,
             }}
           >
-            {/* Top shimmer line */}
+            {/* Top accent line */}
             <div
-              className="absolute top-0 left-0 right-0 h-[1px]"
-              style={{
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-              }}
+              className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+              style={{ background: locked ? "#222" : accent }}
             />
             {/* Icon */}
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 flex-shrink-0"
-              style={{
-                background: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(4px)",
-              }}
+              style={{ background: locked ? "rgba(255,255,255,0.04)" : iconBg }}
             >
               {locked ? (
-                <Lock className="w-5 h-5 text-white/70" />
+                <Lock className="w-5 h-5" style={{ color: "#333" }} />
               ) : (
-                <Icon className="w-5 h-5 text-white" />
+                <Icon className="w-5 h-5" style={{ color: accent }} />
               )}
             </div>
             {/* Text */}
             <div className="mt-auto">
-              <div className="text-sm font-bold text-white leading-tight">
+              <div
+                className="text-sm font-bold leading-tight"
+                style={{ color: locked ? "#444" : "#f1f5f9" }}
+              >
                 {label}
               </div>
               <div
                 className="text-[11px] mt-0.5"
-                style={{
-                  color: locked
-                    ? "rgba(255,255,255,0.5)"
-                    : "rgba(255,255,255,0.75)",
-                }}
+                style={{ color: locked ? "#333" : `${accent}bb` }}
               >
                 {locked ? "Activate to unlock" : desc}
               </div>

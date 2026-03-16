@@ -1,119 +1,27 @@
-import { Activity, Power, PowerOff, WifiOff } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { Activity, WifiOff } from "lucide-react";
 import { useApp } from "../../context/AppContext";
-import { useActor } from "../../hooks/useActor";
-import * as LocalStore from "../../utils/LocalStore";
 
-interface LiveTx {
-  id: string;
-  date: string;
-  time: string;
-  utrNumber: string;
-  credit: number;
-  debit: number;
-  bankId: string;
-  fundType: string;
-}
+const fundLabels: Record<string, string> = {
+  gaming: "Gaming Fund",
+  stock: "Stock Fund",
+  mix: "Mix Fund",
+  political: "Political Fund",
+};
 
-const generate12DigitUTR = () =>
-  Math.floor(100000000000 + Math.random() * 900000000000).toString();
-
-const randAmount = () => Math.floor(Math.random() * 49000 + 1000);
-
-// Commission rate: 15% of transaction amount
-const COMMISSION_RATE = 0.15;
+const fundColors: Record<string, string> = {
+  gaming: "#7c3aed",
+  stock: "#16a34a",
+  mix: "#0d9488",
+  political: "#dc2626",
+};
 
 export default function LiveFundActivity() {
-  const {
-    bankAccounts,
-    activeFundSessions,
-    setActiveFundSession,
-    clearFundSession,
-    isAdmin,
-  } = useApp();
-  const { actor } = useActor();
-  const [liveTxns, setLiveTxns] = useState<LiveTx[]>([]);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { bankAccounts, activeFundSessions, isAdmin, liveTxns } = useApp();
 
   const approvedBanks = bankAccounts.filter((b) => b.status === "approved");
   const activeSessions = Object.entries(activeFundSessions);
-  const activeCount = activeSessions.length;
 
-  const runTick = useCallback(async () => {
-    const sessions = Object.entries(activeFundSessions);
-    if (!sessions.length) return;
-    const sessionEntry = sessions[Math.floor(Math.random() * sessions.length)];
-    if (!sessionEntry) return;
-    const [bankId, { fundType }] = sessionEntry;
-    const utr = generate12DigitUTR();
-    const isCredit = Math.random() > 0.3;
-    const amount = randAmount();
-    const now = new Date();
-    const newTx: LiveTx = {
-      id: Math.random().toString(36),
-      date: now.toLocaleDateString("en-IN"),
-      time: now.toLocaleTimeString("en-IN"),
-      utrNumber: utr,
-      credit: isCredit ? amount : 0,
-      debit: isCredit ? 0 : amount,
-      bankId,
-      fundType,
-    };
-    setLiveTxns((prev) => [newTx, ...prev].slice(0, 50));
-
-    // Add commission to admin balance
-    const commission = +(amount * COMMISSION_RATE).toFixed(2);
-    LocalStore.addAdminCommission(commission);
-    LocalStore.addAdminCommissionLog({
-      bankId,
-      bankName: approvedBanks.find((b) => b.id === bankId)?.bankName || "Bank",
-      accountNumber:
-        approvedBanks.find((b) => b.id === bankId)?.accountNumber || "",
-      fundType,
-      amount: commission,
-      date: now.toISOString(),
-    });
-
-    if (actor) {
-      try {
-        await actor.createTransaction(
-          bankId,
-          utr,
-          newTx.credit,
-          newTx.debit,
-          fundType,
-        );
-      } catch {}
-    }
-  }, [activeFundSessions, actor, approvedBanks]);
-
-  useEffect(() => {
-    if (!isAdmin || activeCount === 0) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      return;
-    }
-    // Run immediately once
-    runTick();
-    intervalRef.current = setInterval(runTick, 15000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isAdmin, activeCount, runTick]);
-
-  const handleToggle = (bankId: string, currentFundType: string) => {
-    if (activeFundSessions[bankId]) {
-      clearFundSession(bankId);
-      toast.success("Fund activity stopped");
-    } else {
-      const sessionId = `session_${Date.now()}`;
-      setActiveFundSession(bankId, sessionId, currentFundType);
-      toast.success(`${currentFundType.toUpperCase()} fund activity started`);
-    }
-  };
-
-  const getBankName = (id: string) =>
-    approvedBanks.find((b) => b.id === id)?.bankName || "Unknown";
+  const getBankById = (id: string) => approvedBanks.find((b) => b.id === id);
 
   // Non-admin: show offline
   if (!isAdmin) {
@@ -124,41 +32,41 @@ export default function LiveFundActivity() {
           <h2 className="text-xl font-bold gold-text">Live Fund Activity</h2>
         </div>
         <div
-          className="dark-card rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center"
+          className="rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center"
+          style={{
+            background: "#000000",
+            border: "1px solid rgba(220,38,38,0.25)",
+          }}
           data-ocid="live_activity.offline_state"
         >
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{
-              background: "oklch(0.6 0.2 25 / 12%)",
-              border: "1px solid oklch(0.6 0.2 25 / 25%)",
-            }}
-          >
-            <WifiOff
-              className="w-8 h-8"
-              style={{ color: "oklch(0.65 0.2 25)" }}
-            />
-          </div>
+          <WifiOff className="w-10 h-10" style={{ color: "#dc2626" }} />
           <div>
-            <div className="font-bold text-white mb-1">
-              Live Transactions Offline
-            </div>
+            <div className="font-bold text-white mb-1 text-lg">OFFLINE</div>
             <div className="text-xs text-gray-500">
-              Live transaction feed is not available for your account.
+              Live transaction feed is not available.
             </div>
           </div>
           <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
-            style={{
-              background: "oklch(0.6 0.2 25 / 12%)",
-              color: "oklch(0.65 0.2 25)",
-            }}
+            className="rounded-xl p-4 w-full mt-2"
+            style={{ background: "#000000", border: "1px solid #1a1a1a" }}
           >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ background: "oklch(0.6 0.2 25)" }}
-            />
-            OFFLINE
+            <div className="text-xs text-gray-700 mb-3 font-bold uppercase tracking-widest">
+              Bank Details
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Bank Name</span>
+                <span className="text-gray-800">---</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Account No.</span>
+                <span className="text-gray-800">---</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">IFSC Code</span>
+                <span className="text-gray-800">---</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -166,232 +74,227 @@ export default function LiveFundActivity() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Activity className="w-6 h-6 gold-text" />
-          <h2 className="text-xl font-bold gold-text">Live Fund Activity</h2>
-        </div>
-        <div
-          className="flex items-center gap-2 px-3 py-1 rounded-full"
-          style={{
-            background:
-              activeCount > 0 ? "oklch(0.6 0.2 145 / 12%)" : "oklch(0.13 0 0)",
-            border:
-              activeCount > 0
-                ? "1px solid oklch(0.6 0.2 145 / 30%)"
-                : "1px solid oklch(0.2 0 0)",
-          }}
-        >
-          {activeCount > 0 && <div className="live-dot" />}
-          <span
-            className="text-xs font-bold"
-            style={{
-              color: activeCount > 0 ? "oklch(0.7 0.2 145)" : "oklch(0.5 0 0)",
-            }}
-          >
-            {activeCount > 0 ? `${activeCount} LIVE` : "ALL OFF"}
-          </span>
-        </div>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Activity className="w-6 h-6 gold-text" />
+        <h2 className="text-xl font-bold gold-text">Live Fund Activity</h2>
       </div>
 
-      {/* Bank cards with toggle */}
-      <div className="grid grid-cols-1 gap-3">
-        {approvedBanks.length === 0 && (
+      {/* Active Fund Sessions Info */}
+      {activeSessions.length === 0 ? (
+        <div
+          data-ocid="live_activity.empty_state"
+          className="rounded-xl p-8 text-center"
+          style={{ background: "#000000", border: "1px solid #1a1a1a" }}
+        >
+          <WifiOff
+            className="w-10 h-10 mx-auto mb-3"
+            style={{ color: "#333" }}
+          />
+          <div className="font-bold text-gray-600 mb-1">OFFLINE</div>
+          <p className="text-gray-700 text-xs mb-4">
+            No fund is currently active.
+          </p>
           <div
-            data-ocid="live_activity.empty_state"
-            className="dark-card rounded-xl p-10 text-center"
+            className="rounded-xl p-4 text-left mt-3"
+            style={{ background: "#000000", border: "1px solid #1a1a1a" }}
           >
-            <p className="text-gray-500">
-              No approved bank accounts. Approve banks from Bank Approval
-              section.
-            </p>
+            <div className="text-xs text-gray-700 mb-3 font-bold uppercase tracking-widest">
+              Bank Details
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Bank Name</span>
+                <span className="text-gray-800">---</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Account No.</span>
+                <span className="text-gray-800">---</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">IFSC Code</span>
+                <span className="text-gray-800">---</span>
+              </div>
+            </div>
           </div>
-        )}
-        {approvedBanks.map((bank, i) => {
-          const isActive = !!activeFundSessions[bank.id];
-          const fundType =
-            activeFundSessions[bank.id]?.fundType || bank.fundType || "gaming";
+        </div>
+      ) : (
+        activeSessions.map(([bankId, { fundType }], idx) => {
+          const bank = getBankById(bankId);
+          if (!bank) return null;
+          const color = fundColors[fundType] ?? "#7c3aed";
+          const fundLabel = fundLabels[fundType] ?? fundType;
+
           return (
             <div
-              key={bank.id}
-              data-ocid={`live_activity.item.${i + 1}`}
-              className="dark-card rounded-xl p-4"
-              style={{
-                border: isActive
-                  ? "1px solid oklch(0.6 0.2 145 / 30%)"
-                  : "1px solid oklch(0.2 0 0)",
-              }}
+              key={bankId}
+              data-ocid={`live_activity.session.${idx + 1}`}
+              className="space-y-3"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="font-bold text-white text-sm">
-                    {bank.bankName}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {bank.accountHolderName}
-                  </div>
-                  <div className="text-xs font-mono text-gray-600 mt-0.5">
-                    Acc: {bank.accountNumber}
-                  </div>
-                  <div className="text-[10px] text-gray-600 mt-0.5 capitalize">
-                    Fund: {fundType} | IFSC: {bank.ifscCode}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {isActive && (
-                    <div
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-full"
-                      style={{ background: "oklch(0.6 0.2 145 / 12%)" }}
-                    >
+              <div>
+                <p
+                  className="text-xs font-bold uppercase tracking-widest mb-2"
+                  style={{ color: "#d4a017" }}
+                >
+                  Linked Bank Account
+                </p>
+                <div
+                  className="rounded-xl p-4"
+                  style={{
+                    border: `1px solid ${color}30`,
+                    background: "#000000",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-black text-white text-sm uppercase">
+                          {bank.bankName}
+                        </span>
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                          style={{
+                            background: "rgba(22,163,74,0.15)",
+                            border: "1px solid rgba(22,163,74,0.35)",
+                            color: "#4ade80",
+                          }}
+                        >
+                          APPROVED
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-gray-500">
+                          Account: {bank.accountNumber} | IFSC: {bank.ifscCode}
+                        </p>
+                        {bank.upiId && (
+                          <p className="text-xs text-gray-500">
+                            UPI: {bank.upiId}
+                          </p>
+                        )}
+                        {bank.mobileNumber && (
+                          <p className="text-xs text-gray-500">
+                            Mobile: {bank.mobileNumber}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <div className="live-dot" />
                       <span
-                        className="text-[10px] font-bold"
-                        style={{ color: "oklch(0.7 0.2 145)" }}
+                        className="text-xs font-bold"
+                        style={{ color: "#4ade80" }}
                       >
                         LIVE
                       </span>
                     </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleToggle(bank.id, fundType)}
-                    data-ocid={`live_activity.toggle.${i + 1}`}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all"
-                    style={{
-                      background: isActive
-                        ? "oklch(0.5 0.2 25 / 15%)"
-                        : "oklch(0.6 0.2 145 / 15%)",
-                      border: isActive
-                        ? "1px solid oklch(0.5 0.2 25 / 30%)"
-                        : "1px solid oklch(0.6 0.2 145 / 30%)",
-                      color: isActive
-                        ? "oklch(0.7 0.2 25)"
-                        : "oklch(0.7 0.2 145)",
-                    }}
+                  </div>
+                  <div
+                    className="mt-3 pt-3 text-xs"
+                    style={{ borderTop: `1px solid ${color}20`, color }}
                   >
-                    {isActive ? (
-                      <PowerOff className="w-3.5 h-3.5" />
-                    ) : (
-                      <Power className="w-3.5 h-3.5" />
-                    )}
-                    {isActive ? "Turn OFF" : "Turn ON"}
-                  </button>
+                    {fundLabel} is ON
+                  </div>
                 </div>
               </div>
             </div>
           );
-        })}
-      </div>
+        })
+      )}
 
-      {/* Live transaction feed */}
-      <div className="dark-card rounded-xl overflow-hidden">
-        <div
-          className="px-4 py-3 flex items-center justify-between"
-          style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
-        >
-          <div className="flex items-center gap-2">
-            {activeCount > 0 && <div className="live-dot" />}
+      {/* Live Transaction Feed */}
+      {activeSessions.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="live-dot" />
             <span className="text-sm font-bold gold-text">
-              {activeCount > 0
-                ? "LIVE TRANSACTION FEED"
-                : "TRANSACTION HISTORY"}
+              LIVE TRANSACTIONS
             </span>
           </div>
-          <span className="text-xs text-gray-500">
-            {liveTxns.length} entries
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full" data-ocid="live_activity.table">
-            <thead>
-              <tr
-                style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
-              >
-                {[
-                  "Date",
-                  "Time",
-                  "Bank",
-                  "UTR Number",
-                  "Fund",
-                  "Credit (₹)",
-                  "Debit (₹)",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: "oklch(0.75 0.15 85)" }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {liveTxns.length === 0 ? (
-                <tr data-ocid="live_activity.empty_state">
-                  <td
-                    colSpan={7}
-                    className="text-center py-10 text-gray-600 text-sm"
-                  >
-                    {activeCount > 0
-                      ? "Waiting for first transaction..."
-                      : "Turn ON a bank account to start live activity"}
-                  </td>
-                </tr>
-              ) : (
-                liveTxns.map((tx, i) => (
-                  <tr
+
+          {liveTxns.length === 0 ? (
+            <div
+              data-ocid="live_activity.txns_empty_state"
+              className="rounded-xl p-8 text-center"
+              style={{ background: "#000000", border: "1px solid #1a1a1a" }}
+            >
+              <p className="text-gray-600 text-sm">
+                Waiting for first transaction...
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {liveTxns.map((tx, i) => {
+                const isCredit = tx.credit > 0;
+                const txBank = getBankById(tx.bankId);
+                return (
+                  <div
                     key={tx.id}
                     data-ocid={`live_activity.tx.${i + 1}`}
-                    className="table-row-hover"
+                    className="rounded-xl p-4"
                     style={{
-                      borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)",
+                      background: "#000000",
+                      border: "1px solid rgba(255,255,255,0.08)",
                     }}
                   >
-                    <td className="px-3 py-2.5 text-xs text-gray-300">
-                      {tx.date}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-gray-400">
-                      {tx.time}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-white">
-                      {getBankName(tx.bankId)}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs font-mono text-gray-400">
-                      {tx.utrNumber}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className="text-xs font-bold uppercase capitalize"
-                        style={{ color: "oklch(0.75 0.15 220)" }}
-                      >
-                        {tx.fundType}
-                      </span>
-                    </td>
-                    <td
-                      className="px-3 py-2.5 text-xs font-semibold"
-                      style={{ color: "oklch(0.7 0.2 145)" }}
-                    >
-                      {tx.credit > 0
-                        ? `+${tx.credit.toLocaleString("en-IN")}`
-                        : "-"}
-                    </td>
-                    <td
-                      className="px-3 py-2.5 text-xs font-semibold"
-                      style={{ color: "oklch(0.65 0.2 25)" }}
-                    >
-                      {tx.debit > 0
-                        ? `-${tx.debit.toLocaleString("en-IN")}`
-                        : "-"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded-full"
+                            style={{
+                              background: isCredit
+                                ? "rgba(22,163,74,0.15)"
+                                : "rgba(220,38,38,0.15)",
+                              color: isCredit ? "#4ade80" : "#f87171",
+                            }}
+                          >
+                            {isCredit ? "CREDIT" : "DEBIT"}
+                          </span>
+                          <span
+                            className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                            style={{
+                              background: "rgba(255,255,255,0.05)",
+                              color: "#666",
+                            }}
+                          >
+                            {fundLabels[tx.fundType] ?? tx.fundType}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-gray-400 font-mono">
+                          UTR: {tx.utrNumber}
+                        </div>
+                        {txBank && (
+                          <div className="text-[10px] text-gray-500 font-mono">
+                            {txBank.bankName}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div
+                          className="text-base font-black"
+                          style={{ color: isCredit ? "#4ade80" : "#f87171" }}
+                        >
+                          {isCredit ? "+" : "-"}₹
+                          {(isCredit ? tx.credit : tx.debit).toLocaleString(
+                            "en-IN",
+                          )}
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">
+                          {tx.date}
+                        </div>
+                        <div className="text-[10px] text-gray-600">
+                          {tx.time}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

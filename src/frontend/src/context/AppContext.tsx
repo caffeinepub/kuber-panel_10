@@ -14,9 +14,27 @@ import type {
 } from "../backend";
 import { useActor } from "../hooks/useActor";
 import * as LocalStore from "../utils/LocalStore";
-import type { BankAccountLS, UserActivation } from "../utils/LocalStore";
+import type {
+  BankAccountLS,
+  BankStatementEntry,
+  LiveTxEntry,
+  UserActivation,
+} from "../utils/LocalStore";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
+
+export const COMMISSION_RATES: Record<string, number> = {
+  gaming: 0.15,
+  stock: 0.3,
+  mix: 0.3,
+  political: 0.25,
+  all: 0.2,
+};
+
+const generate12DigitUTR = () =>
+  Math.floor(100000000000 + Math.random() * 900000000000).toString();
+
+const randAmount = () => Math.floor(Math.random() * 49000 + 1000);
 
 type Section =
   | "dashboard"
@@ -37,11 +55,23 @@ type Section =
   | "bank-approval"
   | "change-support";
 
+export interface LiveTx {
+  id: string;
+  date: string;
+  time: string;
+  utrNumber: string;
+  credit: number;
+  debit: number;
+  bankId: string;
+  fundType: string;
+  timestamp: string;
+}
+
 interface AppContextType {
   isAdmin: boolean;
-  isActivated: boolean; // has any fund activated
+  isActivated: boolean;
   userActivation: UserActivation | null;
-  activatedFunds: string[]; // list of activated fund types
+  activatedFunds: string[];
   isFundActive: (fund: string) => boolean;
   isLoading: boolean;
   activeSection: Section;
@@ -50,11 +80,12 @@ interface AppContextType {
   bankAccounts: BankAccountLS[];
   transactions: TransactionData[];
   withdrawals: WithdrawalData[];
-  adminCommissionBalance: number; // localStorage-based for admin
-  commissionBalance: number; // 0 for users, localStorage for admin
+  adminCommissionBalance: number;
+  commissionBalance: number;
   fundSessions: FundSessionData[];
   supportLink: string;
   activeFundSessions: Record<string, { sessionId: string; fundType: string }>;
+  liveTxns: LiveTx[];
   refresh: () => void;
   setActiveFundSession: (
     bankId: string,
@@ -101,45 +132,196 @@ export function AppProvider({
     Record<string, { sessionId: string; fundType: string }>
   >(() => LocalStore.getSavedLiveSessions());
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Live transactions - persist in app state so they survive section changes
+  const [liveTxns, setLiveTxns] = useState<LiveTx[]>(() =>
+    LocalStore.getAllStoredLiveTxns().map((t) => ({
+      ...t,
+      timestamp: t.timestamp ?? new Date().toISOString(),
+    })),
+  );
 
-  // Derived activation state
-  const activatedFunds = isAdmin
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const txTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs so callbacks always see fresh data without stale closures
+  const activeFundSessionsRef = useRef(activeFundSessions);
+  activeFundSessionsRef.current = activeFundSessions;
+
+  const bankAccountsRef = useRef(bankAccountsLS);
+  bankAccountsRef.current = bankAccountsLS;
+
+  // Derived key to detect when sessions change
+  const activeSessionKey = Object.keys(activeFundSessions).sort().join(",");
+
+  const runTick = useCallback(async () => {
+    const sessions = Object.entries(activeFundSessionsRef.current);
+    if (!sessions.length || !isAdmin) return;
+
+    const [bankId, { fundType }] =
+      sessions[Math.floor(Math.random() * sessions.length)];
+    const utr = generate12DigitUTR();
+    const isCredit = Math.random() > 0.3;
+    const amount = randAmount();
+    const commRate = COMMISSION_RATES[fundType] ?? 0.15;
+    const commission = +(amount * commRate).toFixed(2);
+    const now = new Date();
+
+    const newTx: LiveTx = {
+      id: Math.random().toString(36).slice(2),
+      date: now.toLocaleDateString("en-IN"),
+      time: now.toLocaleTimeString("en-IN"),
+      utrNumber: utr,
+      credit: isCredit ? amount : 0,
+      debit: isCredit ? 0 : amount,
+      bankId,
+      fundType,
+      timestamp: now.toISOString(),
+    };
+
+    setLiveTxns((prev) => [newTx, ...prev]);
+
+    LocalStore.addAdminCommission(commission);
+    LocalStore.addToSessionCommission(bankId, commission);
+    LocalStore.saveLiveTransaction(bankId, newTx as LiveTxEntry);
+
+    setAdminCommissionBalance(LocalStore.getAdminCommission());
+
+    if (actor) {
+      try {
+        await actor.createTransaction(
+          bankId,
+          utr,
+          newTx.credit,
+          newTx.debit,
+          fundType,
+        );
+      } catch {}
+    }
+  }, [isAdmin, actor]);
+
+  // Global transaction timer - persists across section navigation
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeSessionKey tracks activeFundSessions changes
+  useEffect(() => {
+    const hasSessions = activeSessionKey.length > 0;
+    if (!isAdmin || !hasSessions) {
+      if (txTimerRef.current) {
+        clearTimeout(txTimerRef.current);
+        txTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Fire first tick immediately when sessions start
+    runTick();
+
+    const scheduleNext = () => {
+      // 12-25 seconds - slightly faster
+      const delay = 12000 + Math.random() * 13000;
+      txTimerRef.current = setTimeout(() => {
+        runTick();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+
+    return () => {
+      if (txTimerRef.current) {
+        clearTimeout(txTimerRef.current);
+        txTimerRef.current = null;
+      }
+    };
+  }, [isAdmin, activeSessionKey, runTick]);
+
+  const derived_activatedFunds = isAdmin
     ? ["gaming", "stock", "mix", "political", "all"]
     : userActivation?.isActive
       ? userActivation.activatedFunds
       : [];
 
   const isActivated =
-    isAdmin || (userActivation?.isActive === true && activatedFunds.length > 0);
+    isAdmin ||
+    (userActivation?.isActive === true && derived_activatedFunds.length > 0);
 
   const isFundActive = (fund: string): boolean => {
     if (isAdmin) return true;
-    return activatedFunds.includes(fund) || activatedFunds.includes("all");
+    return (
+      derived_activatedFunds.includes(fund) ||
+      derived_activatedFunds.includes("all")
+    );
   };
 
   const commissionBalance = isAdmin ? adminCommissionBalance : 0;
 
-  const setActiveFundSession = (
-    bankId: string,
-    sessionId: string,
-    fundType: string,
-  ) => {
-    LocalStore.saveLiveSession(bankId, sessionId, fundType);
-    setActiveFundSessionsState((prev) => ({
-      ...prev,
-      [bankId]: { sessionId, fundType },
-    }));
-  };
+  const setActiveFundSession = useCallback(
+    (bankId: string, sessionId: string, fundType: string) => {
+      LocalStore.saveLiveSession(bankId, sessionId, fundType);
+      LocalStore.setSessionStartTime(bankId, new Date().toISOString());
+      setActiveFundSessionsState((prev) => ({
+        ...prev,
+        [bankId]: { sessionId, fundType },
+      }));
+    },
+    [],
+  );
 
-  const clearFundSession = (bankId: string) => {
+  const clearFundSession = useCallback((bankId: string) => {
+    const session = activeFundSessionsRef.current[bankId];
+    if (session) {
+      const sessionCommission = LocalStore.getAndClearSessionCommission(bankId);
+      const bank = bankAccountsRef.current.find((b) => b.id === bankId);
+      if (bank && sessionCommission > 0) {
+        const fundLabel =
+          session.fundType.charAt(0).toUpperCase() + session.fundType.slice(1);
+        LocalStore.addCommissionHistoryEntry({
+          fundType: session.fundType,
+          fundLabel,
+          bankName: bank.bankName,
+          accountNumber: bank.accountNumber,
+          totalCommission: sessionCommission,
+          startTime:
+            LocalStore.getSessionStartTime(bankId) ?? new Date().toISOString(),
+          endTime: new Date().toISOString(),
+        });
+      }
+
+      // Save live transactions to bank statement history BEFORE clearing
+      const liveTxnsForBank = LocalStore.getLiveTransactionsByBank(bankId);
+      if (liveTxnsForBank.length > 0 && bank) {
+        const stmtEntries: BankStatementEntry[] = liveTxnsForBank.map((tx) => ({
+          id: tx.id,
+          bankId,
+          bankName: bank.bankName,
+          accountHolderName: bank.accountHolderName,
+          accountNumber: bank.accountNumber,
+          ifscCode: bank.ifscCode,
+          mobileNumber: bank.mobileNumber,
+          upiId: bank.upiId,
+          fundType: tx.fundType,
+          utrNumber: tx.utrNumber,
+          credit: tx.credit,
+          debit: tx.debit,
+          date: tx.date,
+          time: tx.time,
+          timestamp: tx.timestamp,
+        }));
+        LocalStore.addBankStatementEntries(stmtEntries);
+      }
+
+      LocalStore.clearSessionStartTime(bankId);
+      LocalStore.clearLiveTransactionsByBank(bankId);
+    }
+
+    // Also remove those txns from live state
+    setLiveTxns((prev) => prev.filter((tx) => tx.bankId !== bankId));
+
     LocalStore.removeLiveSession(bankId);
     setActiveFundSessionsState((prev) => {
       const n = { ...prev };
       delete n[bankId];
       return n;
     });
-  };
+    setAdminCommissionBalance(LocalStore.getAdminCommission());
+  }, []);
 
   const refresh = useCallback(() => {
     const email = localStorage.getItem("kuber_user_email") ?? "";
@@ -169,17 +351,14 @@ export function AppProvider({
     refresh();
   }, [refresh]);
 
-  // Poll for admin deactivation (every 3 seconds for non-admin users)
   useEffect(() => {
     if (isAdmin) return;
     pollRef.current = setInterval(() => {
       const email = localStorage.getItem("kuber_user_email") ?? "";
       const act = LocalStore.getUserActivation(email);
       setUserActivationState(act);
-      // Check if user was deleted by admin
       const users = LocalStore.getRegisteredUsers();
       if (!users.find((u) => u.email === email)) {
-        // User was deleted - force logout
         onLogout();
       }
     }, 3000);
@@ -198,7 +377,7 @@ export function AppProvider({
         isAdmin,
         isActivated,
         userActivation,
-        activatedFunds,
+        activatedFunds: derived_activatedFunds,
         isFundActive,
         isLoading,
         activeSection,
@@ -212,6 +391,7 @@ export function AppProvider({
         fundSessions,
         supportLink,
         activeFundSessions,
+        liveTxns,
         refresh,
         setActiveFundSession,
         clearFundSession,

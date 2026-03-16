@@ -48,7 +48,7 @@ const emptyForm = {
   internetBankingPassword: "",
   upiId: "",
   qrCodeUrl: "",
-  fundType: "gaming",
+  fundType: "gaming", // kept in data model for compatibility but hidden from UI
 };
 
 export default function AddBankAccount() {
@@ -63,7 +63,6 @@ export default function AddBankAccount() {
 
   const triggerRefresh = () => setRefreshKey((k) => k + 1);
 
-  // Show activation gate if not activated
   if (!isAdmin && !isActivated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 space-y-4">
@@ -232,28 +231,7 @@ export default function AddBankAccount() {
               "password",
             )}
             {field("UPI ID", "upiId")}
-            <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                Fund Type
-              </div>
-              <select
-                value={form.fundType}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, fundType: e.target.value }))
-                }
-                data-ocid="add_bank.fundType.select"
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white outline-none"
-                style={{
-                  background: "oklch(0.13 0 0)",
-                  border: "1px solid oklch(0.75 0.15 85 / 20%)",
-                }}
-              >
-                <option value="gaming">Gaming Fund</option>
-                <option value="stock">Stock Fund</option>
-                <option value="mix">Mix Fund</option>
-                <option value="political">Political Fund</option>
-              </select>
-            </div>
+            {/* fundType select removed - not needed by user */}
           </div>
           <button
             type="button"
@@ -290,7 +268,7 @@ export default function AddBankAccount() {
                 key={acc.id}
                 data-ocid={`add_bank.item.${i + 1}`}
                 className="dark-card rounded-xl p-4"
-                style={{ border: `1px solid ${sc.color} / 20%` }}
+                style={{ border: `1px solid ${sc.color}33` }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
@@ -317,9 +295,6 @@ export default function AddBankAccount() {
                     </div>
                     <div className="text-xs font-mono text-gray-600 mt-0.5">
                       Acc: {acc.accountNumber} | IFSC: {acc.ifscCode}
-                    </div>
-                    <div className="text-[10px] text-gray-600 mt-0.5 capitalize">
-                      Fund: {acc.fundType}
                     </div>
                   </button>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -422,7 +397,6 @@ export default function AddBankAccount() {
                 ["Mobile Number", viewAccount.mobileNumber],
                 ["Internet Banking ID", viewAccount.internetBankingId],
                 ["UPI ID", viewAccount.upiId],
-                ["Fund Type", viewAccount.fundType],
                 ["Status", viewAccount.status.toUpperCase()],
                 [
                   "Added On",

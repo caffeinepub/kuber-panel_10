@@ -8,11 +8,10 @@ export interface ActivationCodeLS {
   usedByEmail?: string;
 }
 
-// Updated: supports multiple fund activations per user
 export interface UserActivation {
-  isActive: boolean; // false = admin deactivated
-  activatedFunds: string[]; // e.g. ['gaming', 'stock']
-  fundCodes: Record<string, string>; // fundType -> code used
+  isActive: boolean;
+  activatedFunds: string[];
+  fundCodes: Record<string, string>;
   firstActivatedAt: string;
   deactivatedByAdmin?: boolean;
 }
@@ -118,7 +117,6 @@ export function getUserActivation(email: string): UserActivation | null {
   const all = getUserActivations();
   const raw = all[email];
   if (!raw) return null;
-  // Migrate old format (activatedFund string → activatedFunds array)
   if (!(raw as any).activatedFunds) {
     const oldFund = (raw as any).activatedFund ?? "gaming";
     return {
@@ -218,7 +216,6 @@ export function saveRegisteredUser(email: string, password: string): void {
 export function deleteRegisteredUser(email: string): void {
   const users = getRegisteredUsers().filter((u) => u.email !== email);
   localStorage.setItem("kuber_registered_users", JSON.stringify(users));
-  // Also remove activation
   removeUserActivation(email);
 }
 
@@ -340,8 +337,182 @@ export function clearAllLiveSessions(): void {
   localStorage.removeItem("kuber_live_sessions");
 }
 
-// --- Admin Commission Transaction Log ---
+// --- Session Commission Tracking (per bankId, accumulates while fund is ON) ---
 
+function getSessionCommissions(): Record<string, number> {
+  try {
+    return JSON.parse(
+      localStorage.getItem("kuber_session_commissions") ?? "{}",
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function addToSessionCommission(bankId: string, amount: number): void {
+  const all = getSessionCommissions();
+  all[bankId] = +((all[bankId] ?? 0) + amount).toFixed(2);
+  localStorage.setItem("kuber_session_commissions", JSON.stringify(all));
+}
+
+export function getAndClearSessionCommission(bankId: string): number {
+  const all = getSessionCommissions();
+  const val = all[bankId] ?? 0;
+  delete all[bankId];
+  localStorage.setItem("kuber_session_commissions", JSON.stringify(all));
+  return val;
+}
+
+// --- Session Start Time ---
+
+export function setSessionStartTime(bankId: string, time: string): void {
+  const all: Record<string, string> = JSON.parse(
+    localStorage.getItem("kuber_session_start_times") ?? "{}",
+  );
+  all[bankId] = time;
+  localStorage.setItem("kuber_session_start_times", JSON.stringify(all));
+}
+
+export function getSessionStartTime(bankId: string): string | null {
+  try {
+    const all: Record<string, string> = JSON.parse(
+      localStorage.getItem("kuber_session_start_times") ?? "{}",
+    );
+    return all[bankId] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSessionStartTime(bankId: string): void {
+  try {
+    const all: Record<string, string> = JSON.parse(
+      localStorage.getItem("kuber_session_start_times") ?? "{}",
+    );
+    delete all[bankId];
+    localStorage.setItem("kuber_session_start_times", JSON.stringify(all));
+  } catch {}
+}
+
+// --- Live Transactions (saved to localStorage for bank statement) ---
+
+export interface LiveTxEntry {
+  id: string;
+  date: string;
+  time: string;
+  utrNumber: string;
+  credit: number;
+  debit: number;
+  fundType: string;
+  bankId: string;
+  timestamp: string;
+}
+
+function getAllLiveTransactions(): Record<string, LiveTxEntry[]> {
+  try {
+    return JSON.parse(localStorage.getItem("kuber_live_txns") ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function saveLiveTransaction(bankId: string, tx: LiveTxEntry): void {
+  const all = getAllLiveTransactions();
+  if (!all[bankId]) all[bankId] = [];
+  all[bankId].unshift(tx);
+  // Keep last 500 per bank
+  all[bankId] = all[bankId].slice(0, 500);
+  localStorage.setItem("kuber_live_txns", JSON.stringify(all));
+}
+
+export function getLiveTransactionsByBank(bankId: string): LiveTxEntry[] {
+  const all = getAllLiveTransactions();
+  return all[bankId] ?? [];
+}
+
+export function clearLiveTransactionsByBank(bankId: string): void {
+  const all = getAllLiveTransactions();
+  delete all[bankId];
+  localStorage.setItem("kuber_live_txns", JSON.stringify(all));
+}
+
+export function getAllStoredLiveTxns(): LiveTxEntry[] {
+  const all = getAllLiveTransactions();
+  return Object.values(all)
+    .flat()
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+// --- Commission History (one entry per fund session, added on fund OFF) ---
+
+export interface CommissionHistoryEntry {
+  id: string;
+  fundType: string;
+  fundLabel: string;
+  bankName: string;
+  accountNumber: string;
+  totalCommission: number;
+  startTime: string;
+  endTime: string;
+}
+
+export function getCommissionHistory(): CommissionHistoryEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem("kuber_commission_history") ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function addCommissionHistoryEntry(
+  entry: Omit<CommissionHistoryEntry, "id">,
+): void {
+  const history = getCommissionHistory();
+  history.unshift({
+    ...entry,
+    id: `ch_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  });
+  localStorage.setItem(
+    "kuber_commission_history",
+    JSON.stringify(history.slice(0, 200)),
+  );
+}
+
+// --- Completed Bank Statement Entries (saved when fund is turned OFF) ---
+
+export interface BankStatementEntry {
+  id: string;
+  bankId: string;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  mobileNumber?: string;
+  upiId?: string;
+  fundType: string;
+  utrNumber: string;
+  credit: number;
+  debit: number;
+  date: string;
+  time: string;
+  timestamp: string;
+}
+
+export function getBankStatementHistory(): BankStatementEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem("kuber_bank_stmt_history") ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function addBankStatementEntries(entries: BankStatementEntry[]): void {
+  const history = getBankStatementHistory();
+  const newHistory = [...entries, ...history].slice(0, 1000);
+  localStorage.setItem("kuber_bank_stmt_history", JSON.stringify(newHistory));
+}
+
+// Legacy support
 export interface CommissionLogEntry {
   id: string;
   bankId: string;
@@ -370,7 +541,6 @@ export function addAdminCommissionLog(
     ...entry,
     id: `comm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   });
-  // Keep last 200 entries
   localStorage.setItem(
     "kuber_admin_commission_log",
     JSON.stringify(log.slice(0, 200)),
