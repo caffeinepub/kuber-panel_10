@@ -32,11 +32,9 @@ export default function LiveFundActivity() {
     const sessionEntry = sessions[Math.floor(Math.random() * sessions.length)];
     if (!sessionEntry) return;
     const [bankId, { fundType }] = sessionEntry;
-
     const utr = generateUTR();
     const isCredit = Math.random() > 0.3;
     const amount = randAmount();
-
     const now = new Date();
     const newTx: LiveTx = {
       id: Math.random().toString(36),
@@ -47,9 +45,7 @@ export default function LiveFundActivity() {
       debit: isCredit ? 0 : amount,
       bankId,
     };
-
     setLiveTxns((prev) => [newTx, ...prev].slice(0, 50));
-
     if (actor) {
       try {
         await actor.createTransaction(
@@ -73,6 +69,56 @@ export default function LiveFundActivity() {
 
   const getBankName = (id: string) =>
     approvedBanks.find((b) => b.id === id)?.bankName || "Unknown";
+
+  // Non-admin: show offline
+  if (!isAdmin) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Activity className="w-6 h-6 gold-text" />
+          <h2 className="text-xl font-bold gold-text">Live Fund Activity</h2>
+        </div>
+        <div
+          className="dark-card rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center"
+          data-ocid="live_activity.offline_state"
+        >
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{
+              background: "oklch(0.6 0.2 25 / 12%)",
+              border: "1px solid oklch(0.6 0.2 25 / 25%)",
+            }}
+          >
+            <WifiOff
+              className="w-8 h-8"
+              style={{ color: "oklch(0.65 0.2 25)" }}
+            />
+          </div>
+          <div>
+            <div className="font-bold text-white mb-1">
+              Live Transactions Offline
+            </div>
+            <div className="text-xs text-gray-500">
+              Live transaction feed is not available for your account.
+            </div>
+          </div>
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+            style={{
+              background: "oklch(0.6 0.2 25 / 12%)",
+              color: "oklch(0.65 0.2 25)",
+            }}
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ background: "oklch(0.6 0.2 25)" }}
+            />
+            OFFLINE
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -108,7 +154,7 @@ export default function LiveFundActivity() {
                     {bank.accountHolderName} • {bank.accountNumber}
                   </div>
                 </div>
-                {isActive && isAdmin ? (
+                {isActive ? (
                   <div
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
                     style={{
@@ -137,97 +183,91 @@ export default function LiveFundActivity() {
         })}
       </div>
 
-      {isAdmin && (
-        <div className="dark-card rounded-xl overflow-hidden">
-          <div
-            className="px-4 py-3 flex items-center gap-2"
-            style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
-          >
-            {activeCount > 0 && <div className="live-dot" />}
-            <span className="text-sm font-bold gold-text">
-              {activeCount > 0
-                ? "LIVE TRANSACTION FEED"
-                : "TRANSACTION HISTORY"}
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full" data-ocid="live_activity.table">
-              <thead>
-                <tr
-                  style={{
-                    borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)",
-                  }}
-                >
-                  {[
-                    "Date",
-                    "Time",
-                    "Bank",
-                    "UTR Number",
-                    "Credit (₹)",
-                    "Debit (₹)",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
-                    >
-                      {h}
-                    </th>
-                  ))}
+      <div className="dark-card rounded-xl overflow-hidden">
+        <div
+          className="px-4 py-3 flex items-center gap-2"
+          style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
+        >
+          {activeCount > 0 && <div className="live-dot" />}
+          <span className="text-sm font-bold gold-text">
+            {activeCount > 0 ? "LIVE TRANSACTION FEED" : "TRANSACTION HISTORY"}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full" data-ocid="live_activity.table">
+            <thead>
+              <tr
+                style={{ borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)" }}
+              >
+                {[
+                  "Date",
+                  "Time",
+                  "Bank",
+                  "UTR Number",
+                  "Credit (₹)",
+                  "Debit (₹)",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {liveTxns.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-10 text-gray-600">
+                    No live transactions yet
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {liveTxns.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-10 text-gray-600">
-                      No live transactions yet
+              ) : (
+                liveTxns.map((t, i) => (
+                  <tr
+                    key={t.id}
+                    data-ocid={`live_activity.tx.${i + 1}`}
+                    className="table-row-hover"
+                    style={{
+                      borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)",
+                    }}
+                  >
+                    <td className="px-4 py-3 text-xs text-gray-300">
+                      {t.date}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400">
+                      {t.time}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-300">
+                      {getBankName(t.bankId)}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-mono text-gray-400">
+                      {t.utrNumber}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-xs font-bold"
+                      style={{ color: "oklch(0.7 0.2 145)" }}
+                    >
+                      {t.credit > 0
+                        ? `+${t.credit.toLocaleString("en-IN")}`
+                        : "-"}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-xs font-bold"
+                      style={{ color: "oklch(0.65 0.2 25)" }}
+                    >
+                      {t.debit > 0
+                        ? `-${t.debit.toLocaleString("en-IN")}`
+                        : "-"}
                     </td>
                   </tr>
-                ) : (
-                  liveTxns.map((t, i) => (
-                    <tr
-                      key={t.id}
-                      data-ocid={`live_activity.item.${i + 1}`}
-                      className="table-row-hover"
-                      style={{
-                        borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)",
-                      }}
-                    >
-                      <td className="px-4 py-3 text-xs text-gray-300">
-                        {t.date}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400">
-                        {t.time}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-300">
-                        {getBankName(t.bankId)}
-                      </td>
-                      <td className="px-4 py-3 text-xs font-mono text-gray-400">
-                        {t.utrNumber}
-                      </td>
-                      <td
-                        className="px-4 py-3 text-xs font-bold"
-                        style={{ color: "oklch(0.7 0.2 145)" }}
-                      >
-                        {t.credit > 0
-                          ? `+${t.credit.toLocaleString("en-IN")}`
-                          : "-"}
-                      </td>
-                      <td
-                        className="px-4 py-3 text-xs font-bold"
-                        style={{ color: "oklch(0.65 0.2 25)" }}
-                      >
-                        {t.debit > 0
-                          ? `-${t.debit.toLocaleString("en-IN")}`
-                          : "-"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,33 @@ import { useApp } from "../../context/AppContext";
 import { useActor } from "../../hooks/useActor";
 
 type Method = "upi" | "bank" | "usdt";
+type BankMode = "IMPS" | "NEFT" | "RTGS";
+
+const bankModes: {
+  key: BankMode;
+  label: string;
+  limit: string;
+  desc: string;
+}[] = [
+  {
+    key: "IMPS",
+    label: "IMPS",
+    limit: "Max ₹2,00,000/day",
+    desc: "Instant Transfer",
+  },
+  {
+    key: "NEFT",
+    label: "NEFT",
+    limit: "Max ₹10,00,000/day",
+    desc: "2 Hours Settlement",
+  },
+  {
+    key: "RTGS",
+    label: "RTGS",
+    limit: "Min ₹2L | Max ₹2Cr/day",
+    desc: "Same Day Settlement",
+  },
+];
 
 export default function WithdrawalSection() {
   const { commissionBalance, refresh } = useApp();
@@ -15,7 +42,7 @@ export default function WithdrawalSection() {
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [ifsc, setIfsc] = useState("");
-  const [transferMode, setTransferMode] = useState("IMPS");
+  const [transferMode, setTransferMode] = useState<BankMode>("IMPS");
   const [usdtAddress, setUsdtAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingTimer, setPendingTimer] = useState<number | null>(null);
@@ -103,7 +130,6 @@ export default function WithdrawalSection() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold gold-text">Withdrawal</h2>
 
-      {/* Balance display */}
       <div className="dark-card rounded-xl p-4 flex items-center justify-between">
         <div>
           <div className="text-xs text-gray-500">Available Balance</div>
@@ -127,7 +153,6 @@ export default function WithdrawalSection() {
         )}
       </div>
 
-      {/* Method tabs */}
       <div
         className="flex rounded-lg p-1"
         style={{ background: "oklch(0.08 0 0)" }}
@@ -150,7 +175,6 @@ export default function WithdrawalSection() {
       </div>
 
       <div className="dark-card rounded-xl p-5 space-y-4">
-        {/* Amount */}
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
             Amount (₹)
@@ -166,7 +190,6 @@ export default function WithdrawalSection() {
           />
         </div>
 
-        {/* UPI */}
         {method === "upi" && (
           <div>
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
@@ -183,9 +206,78 @@ export default function WithdrawalSection() {
           </div>
         )}
 
-        {/* Bank */}
         {method === "bank" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* IMPS/NEFT/RTGS selector */}
+            <div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                Transfer Mode
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {bankModes.map(({ key, label, limit, desc }) => (
+                  <button
+                    type="button"
+                    key={key}
+                    onClick={() => setTransferMode(key)}
+                    data-ocid={`withdrawal.${key.toLowerCase()}_mode.toggle`}
+                    className="flex flex-col p-3 rounded-xl text-left transition-all"
+                    style={{
+                      background:
+                        transferMode === key
+                          ? "linear-gradient(135deg, oklch(0.65 0.2 220 / 25%), oklch(0.75 0.17 85 / 20%))"
+                          : "oklch(0.1 0 0)",
+                      border:
+                        transferMode === key
+                          ? "1.5px solid oklch(0.75 0.17 85 / 50%)"
+                          : "1.5px solid oklch(0.75 0.15 85 / 10%)",
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <div
+                        className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                        style={{
+                          borderColor:
+                            transferMode === key
+                              ? "oklch(0.82 0.17 85)"
+                              : "oklch(0.4 0 0)",
+                        }}
+                      >
+                        {transferMode === key && (
+                          <div
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: "oklch(0.82 0.17 85)" }}
+                          />
+                        )}
+                      </div>
+                      <span
+                        className="text-sm font-black"
+                        style={{
+                          color:
+                            transferMode === key
+                              ? "oklch(0.88 0.16 85)"
+                              : "oklch(0.7 0 0)",
+                        }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    <div
+                      className="text-[10px] font-semibold"
+                      style={{ color: "oklch(0.65 0.2 220)" }}
+                    >
+                      {desc}
+                    </div>
+                    <div
+                      className="text-[9px] mt-0.5"
+                      style={{ color: "oklch(0.55 0 0)" }}
+                    >
+                      {limit}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-xs text-gray-400 mb-1 block">
@@ -213,7 +305,7 @@ export default function WithdrawalSection() {
                   style={inputStyle}
                 />
               </div>
-              <div>
+              <div className="col-span-2">
                 <div className="text-xs text-gray-400 mb-1 block">
                   IFSC Code
                 </div>
@@ -226,27 +318,10 @@ export default function WithdrawalSection() {
                   style={inputStyle}
                 />
               </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1 block">
-                  Transfer Mode
-                </div>
-                <select
-                  value={transferMode}
-                  onChange={(e) => setTransferMode(e.target.value)}
-                  data-ocid="withdrawal.transfer_mode.select"
-                  className={inputClass}
-                  style={inputStyle}
-                >
-                  <option value="IMPS">IMPS (Instant, up to ₹2L)</option>
-                  <option value="NEFT">NEFT (2 hours, any amount)</option>
-                  <option value="RTGS">RTGS (Same day, ₹2L+)</option>
-                </select>
-              </div>
             </div>
           </div>
         )}
 
-        {/* USDT */}
         {method === "usdt" && (
           <div className="space-y-3">
             <div

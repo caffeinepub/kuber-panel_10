@@ -16,7 +16,8 @@ import type {
   WithdrawalData,
 } from "../backend";
 import { useActor } from "../hooks/useActor";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+
+const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 
 type Section =
   | "dashboard"
@@ -60,14 +61,23 @@ interface AppContextType {
     fundType: string,
   ) => void;
   clearFundSession: (bankId: string) => void;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function AppProvider({
+  children,
+  onLogout,
+}: {
+  children: ReactNode;
+  onLogout: () => void;
+}) {
   const { actor } = useActor();
-  const { identity } = useInternetIdentity();
-  const [isAdmin, setIsAdmin] = useState(false);
+
+  const storedEmail = localStorage.getItem("kuber_user_email") ?? "";
+  const isAdmin = storedEmail.toLowerCase() === ADMIN_EMAIL;
+
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
@@ -108,21 +118,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const refresh = useCallback(async () => {
-    if (!actor || !identity) return;
+    if (!actor) return;
     try {
-      const [admin, profile, banks, txns, bal, commHist, wds, sessions, link] =
+      const [profile, banks, txns, bal, commHist, wds, sessions, link] =
         await Promise.all([
-          actor.isCallerAdmin(),
-          actor.getCallerUserProfile(),
-          actor.getBankAccounts(),
-          actor.getTransactions(),
-          actor.getCommissionBalance(),
-          actor.getCommissionHistory(),
-          actor.getWithdrawals(),
-          actor.getFundSessions(),
-          actor.getSupportLink(),
+          actor.getCallerUserProfile().catch(() => null),
+          actor.getBankAccounts().catch(() => []),
+          actor.getTransactions().catch(() => []),
+          actor.getCommissionBalance().catch(() => 0),
+          actor.getCommissionHistory().catch(() => []),
+          actor.getWithdrawals().catch(() => []),
+          actor.getFundSessions().catch(() => []),
+          actor.getSupportLink().catch(() => "https://t.me/+fUsY5uHRNeYyYmJl"),
         ]);
-      setIsAdmin(admin);
       setUserProfile(profile);
       setBankAccounts(banks);
       setTransactions(txns);
@@ -132,10 +140,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFundSessions(sessions);
       setSupportLink(link);
 
-      if (admin) {
+      if (isAdmin) {
         const [allBanks, codes] = await Promise.all([
-          actor.getAllBankAccounts(),
-          actor.getAllActivationCodes(),
+          actor.getAllBankAccounts().catch(() => []),
+          actor.getAllActivationCodes().catch(() => []),
         ]);
         setAllBankAccounts(allBanks);
         setActivationCodes(codes);
@@ -145,16 +153,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [actor, identity]);
+  }, [actor, isAdmin]);
 
   useEffect(() => {
-    if (actor && identity) {
+    if (actor) {
       setIsLoading(true);
       refresh();
     } else {
       setIsLoading(false);
     }
-  }, [actor, identity, refresh]);
+  }, [actor, refresh]);
+
+  const logout = useCallback(() => {
+    onLogout();
+  }, [onLogout]);
 
   return (
     <AppContext.Provider
@@ -177,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refresh,
         setActiveFundSession,
         clearFundSession,
+        logout,
       }}
     >
       {children}

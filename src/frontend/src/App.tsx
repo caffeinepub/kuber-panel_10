@@ -1,41 +1,32 @@
+import { useState } from "react";
 import { Toaster } from "./components/ui/sonner";
 import { AppProvider } from "./context/AppContext";
-import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import DashboardLayout from "./pages/DashboardLayout";
 import LoginPage from "./pages/LoginPage";
 
 export default function App() {
-  const { identity, isInitializing } = useInternetIdentity();
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => !!localStorage.getItem("kuber_user_email"),
+  );
 
-  if (isInitializing) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "oklch(0.06 0 0)" }}
-      >
-        <div className="text-center">
-          <img
-            src="/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png"
-            alt="Kuber Panel"
-            className="w-24 h-24 mx-auto mb-4 opacity-80"
-          />
-          <div className="gold-text text-xl font-bold tracking-widest">
-            KUBER PANEL
-          </div>
-          <div className="text-sm text-gray-500 mt-2">Loading...</div>
-        </div>
-      </div>
-    );
-  }
+  const handleLogin = (email: string) => {
+    localStorage.setItem("kuber_user_email", email);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("kuber_user_email");
+    setIsLoggedIn(false);
+  };
 
   return (
     <>
-      {identity ? (
-        <AppProvider>
+      {isLoggedIn ? (
+        <AppProvider onLogout={handleLogout}>
           <DashboardLayout />
         </AppProvider>
       ) : (
-        <LoginPage />
+        <LoginPage onLogin={handleLogin} />
       )}
       <Toaster theme="dark" />
     </>

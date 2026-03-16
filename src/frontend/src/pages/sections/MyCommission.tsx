@@ -1,14 +1,18 @@
 import { ArrowDownCircle, Coins } from "lucide-react";
 import { useApp } from "../../context/AppContext";
-import { useActor } from "../../hooks/useActor";
 
 export default function MyCommission() {
-  const { commissionBalance, commissionHistory, setActiveSection } = useApp();
+  const { commissionBalance, commissionHistory, setActiveSection, isAdmin } =
+    useApp();
 
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const recentHistory = commissionHistory
-    .filter((c) => Number(c.date) / 1_000_000 > thirtyDaysAgo)
-    .sort((a, b) => Number(b.date) - Number(a.date));
+  const recentHistory = isAdmin
+    ? commissionHistory
+        .filter((c) => Number(c.date) / 1_000_000 > thirtyDaysAgo)
+        .sort((a, b) => Number(b.date) - Number(a.date))
+    : [];
+
+  const displayBalance = isAdmin ? commissionBalance : 0;
 
   const formatDate = (nano: bigint) =>
     new Date(Number(nano) / 1_000_000).toLocaleDateString("en-IN");
@@ -29,7 +33,6 @@ export default function MyCommission() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold gold-text">My Commission</h2>
 
-      {/* Balance card */}
       <div
         className="rounded-2xl p-6"
         style={{
@@ -45,7 +48,7 @@ export default function MyCommission() {
             </div>
             <div className="text-4xl font-black gold-text">
               ₹
-              {commissionBalance.toLocaleString("en-IN", {
+              {displayBalance.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
               })}
             </div>
@@ -68,7 +71,6 @@ export default function MyCommission() {
         </button>
       </div>
 
-      {/* Commission history */}
       <div className="dark-card rounded-xl overflow-hidden">
         <div
           className="px-4 py-3"
@@ -102,7 +104,9 @@ export default function MyCommission() {
             {recentHistory.length === 0 ? (
               <tr data-ocid="commission.empty_state">
                 <td colSpan={6} className="text-center py-10 text-gray-600">
-                  No commission history yet
+                  {isAdmin
+                    ? "No commission history yet"
+                    : "Commission data not available"}
                 </td>
               </tr>
             ) : (
