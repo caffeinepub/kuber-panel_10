@@ -2,7 +2,6 @@ import { ArrowDownCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "../../context/AppContext";
-import { useActor } from "../../hooks/useActor";
 import * as LocalStore from "../../utils/LocalStore";
 
 type Method = "upi" | "bank" | "usdt";
@@ -36,7 +35,6 @@ const bankModes: {
 
 export default function WithdrawalSection() {
   const { isAdmin, refresh } = useApp();
-  const { actor } = useActor();
   const [method, setMethod] = useState<Method>("upi");
   const [amount, setAmount] = useState("");
   const [upiId, setUpiId] = useState("");
@@ -94,9 +92,6 @@ export default function WithdrawalSection() {
 
     setLoading(true);
     try {
-      if (actor) {
-        await actor.createWithdrawal(amt, method, methodDetails);
-      }
       if (isAdmin) {
         LocalStore.deductAdminCommission(amt);
       }

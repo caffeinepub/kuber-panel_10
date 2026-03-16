@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Link,
   LogOut,
+  Mail,
   MoreVertical,
   Shield,
   Shuffle,
@@ -22,6 +23,7 @@ import {
   Vote,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useApp } from "../context/AppContext";
 import ActivationPanel from "./sections/ActivationPanel";
 import AddBankAccount from "./sections/AddBankAccount";
@@ -38,7 +40,18 @@ import ChangeSupportLink from "./sections/admin/ChangeSupportLink";
 import GeneratedCode from "./sections/admin/GeneratedCode";
 import UserManagement from "./sections/admin/UserManagement";
 
-const LOGO = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
+// Module-level: track which logo works (prevents re-testing on every render)
+let _cachedLogoSrc: string | null = null;
+let _logoFailed = false;
+const LOGO1 = "/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png";
+const LOGO2 = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
+
+(() => {
+  const a = new window.Image();
+  a.src = LOGO1;
+  const b = new window.Image();
+  b.src = LOGO2;
+})();
 
 const userMenuItems = [
   { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -103,52 +116,253 @@ function renderSectionContent(activeSection: string) {
 }
 
 function WelcomePopup({ onClose }: { onClose: () => void }) {
-  const [visible, setVisible] = useState(true);
+  const [logoSrc, setLogoSrc] = useState(_cachedLogoSrc || LOGO1);
+  const [logoFailed, setLogoFailed] = useState(_logoFailed);
+  const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
   useEffect(() => {
-    const t1 = setTimeout(() => setVisible(false), 2800);
-    const t2 = setTimeout(onClose, 3300);
+    const t1 = setTimeout(() => setPhase("hold"), 400);
+    const t2 = setTimeout(() => setPhase("out"), 2400);
+    const t3 = setTimeout(onClose, 2900);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, [onClose]);
-
+  const visible = phase !== "out";
   return (
     <div
       className="fixed inset-0 z-[999] flex items-center justify-center"
       style={{
-        background: "oklch(0 0 0 / 88%)",
-        backdropFilter: "blur(8px)",
+        background: "#000000",
         opacity: visible ? 1 : 0,
-        transition: "opacity 0.5s ease",
+        transition: "opacity 0.45s ease",
+        pointerEvents: visible ? "auto" : "none",
       }}
     >
       <div
-        className="text-center"
+        className="flex flex-col items-center"
         style={{
-          opacity: visible ? 1 : 0,
-          transform: visible ? "scale(1)" : "scale(0.9)",
-          transition: "all 0.5s ease",
+          transform: phase === "in" ? "scale(0.88)" : "scale(1)",
+          opacity: phase === "in" ? 0 : 1,
+          transition:
+            "transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease",
         }}
       >
-        <img
-          src={LOGO}
-          alt="Kuber Panel"
-          style={{
-            width: 130,
-            height: 130,
-            margin: "0 auto 20px",
-            filter: "drop-shadow(0 0 24px oklch(0.82 0.17 85 / 70%))",
-          }}
-        />
+        {!logoFailed ? (
+          <img
+            src={logoSrc}
+            alt="Kuber Panel"
+            loading="eager"
+            onError={() => {
+              if (logoSrc === LOGO1) {
+                _cachedLogoSrc = LOGO2;
+                setLogoSrc(LOGO2);
+              } else {
+                _logoFailed = true;
+                _cachedLogoSrc = null;
+                setLogoFailed(true);
+              }
+            }}
+            style={{
+              width: 120,
+              height: 120,
+              objectFit: "contain",
+              filter: "drop-shadow(0 0 28px rgba(212,160,23,0.7))",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg,#d4a017,#f0c040)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 48,
+              fontWeight: 900,
+              color: "#000",
+            }}
+          >
+            K
+          </div>
+        )}
         <div
-          className="text-3xl font-black tracking-[0.2em] mb-1"
-          style={{ color: "oklch(0.88 0.16 85)" }}
+          className="text-2xl font-black tracking-[0.22em] mt-5 mb-1"
+          style={{
+            background: "linear-gradient(135deg,#f0c040,#d4a017,#f0c040)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
         >
           KUBER PANEL
         </div>
-        <div className="text-sm text-gray-400 tracking-widest">
+        <div className="text-xs text-gray-400 tracking-widest mb-5">
           Official &amp; Licensed Platform
+        </div>
+        <div className="flex items-center gap-2">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#d4a017",
+                animation: `bounce 1.1s ease-in-out ${i * 0.18}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmailRegistrationModal() {
+  const { registerEmail } = useApp();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleRegister = async () => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) {
+      setError("Please enter a valid email address");
+      return;
+    }
+    setLoading(true);
+    try {
+      await registerEmail(trimmed);
+      toast.success("Account registered successfully!");
+    } catch {
+      setError("Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[998] flex items-center justify-center px-4"
+      style={{ background: "#000000" }}
+    >
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-4">
+            <img
+              src={LOGO1}
+              alt="KUBER PANEL"
+              loading="eager"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = LOGO2;
+              }}
+              style={{
+                width: 80,
+                height: 80,
+                objectFit: "contain",
+                filter: "drop-shadow(0 0 16px rgba(212,160,23,0.5))",
+              }}
+            />
+          </div>
+          <h1
+            className="text-2xl font-black tracking-[0.18em] mb-1"
+            style={{
+              background:
+                "linear-gradient(135deg,oklch(0.88 0.16 85),oklch(0.72 0.12 85))",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            KUBER PANEL
+          </h1>
+          <p className="text-xs text-gray-500">
+            Register your email to complete setup
+          </p>
+        </div>
+        <div
+          className="rounded-2xl p-6"
+          style={{
+            background: "oklch(0.08 0.008 220)",
+            border: "1px solid oklch(0.65 0.15 220 / 30%)",
+            boxShadow: "0 24px 64px oklch(0 0 0 / 60%)",
+          }}
+        >
+          <div
+            className="h-[2px] w-full mb-5"
+            style={{
+              background:
+                "linear-gradient(90deg,transparent,oklch(0.75 0.17 85),transparent)",
+              marginTop: -24,
+              marginLeft: -24,
+              width: "calc(100% + 48px)",
+            }}
+          />
+          <h2 className="text-base font-bold text-white mb-1">
+            Register Your Email
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Your email is required for account identification and admin
+            management.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                <Mail className="w-3 h-3" /> Email Address
+              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+                placeholder="yourname@gmail.com"
+                data-ocid="register.input"
+                className="w-full px-4 py-2.5 rounded-lg text-sm text-white placeholder-gray-700 outline-none"
+                style={{
+                  background: "oklch(0.12 0.005 220)",
+                  border: "1px solid oklch(0.65 0.15 220 / 20%)",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.border =
+                    "1px solid oklch(0.65 0.2 220 / 55%)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.border =
+                    "1px solid oklch(0.65 0.15 220 / 20%)";
+                }}
+              />
+            </div>
+            {error && (
+              <div
+                className="text-xs px-3 py-2 rounded-lg"
+                style={{
+                  background: "oklch(0.5 0.2 25 / 15%)",
+                  border: "1px solid oklch(0.5 0.2 25 / 30%)",
+                  color: "oklch(0.72 0.18 25)",
+                }}
+              >
+                {error}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleRegister}
+              disabled={loading}
+              data-ocid="register.submit_button"
+              className="w-full py-3 rounded-xl font-bold text-black tracking-widest text-xs transition-all hover:opacity-90 disabled:opacity-50"
+              style={{
+                background:
+                  "linear-gradient(135deg,oklch(0.85 0.18 85),oklch(0.68 0.14 85))",
+                boxShadow: "0 4px 20px oklch(0.75 0.17 85 / 25%)",
+              }}
+            >
+              {loading ? "REGISTERING..." : "COMPLETE REGISTRATION"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -162,15 +376,26 @@ export default function DashboardLayout() {
     isAdmin,
     isActivated,
     userActivation,
+    needsEmailRegistration,
+    userEmail,
     logout,
   } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const loginId =
+    userEmail ||
+    localStorage.getItem("kuber_admin_fallback_email") ||
+    localStorage.getItem("kuber_user_email") ||
+    "Kuber User";
+
+  const welcomeKey = `kuber_welcomed_${loginId}`;
   const [showWelcome, setShowWelcome] = useState(() => {
-    if (sessionStorage.getItem("kuber_welcomed")) return false;
-    sessionStorage.setItem("kuber_welcomed", "1");
+    if (localStorage.getItem(welcomeKey)) return false;
+    localStorage.setItem(welcomeKey, "1");
     return true;
   });
+
   const menuRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -179,7 +404,6 @@ export default function DashboardLayout() {
   const currentItem = allMenuItems.find((m) => m.id === activeSection);
   const currentLabel = currentItem?.label || "Dashboard";
   const CurrentIcon = currentItem?.Icon;
-  const loginId = localStorage.getItem("kuber_user_email") || "Kuber User";
 
   const [profilePhoto, setProfilePhoto] = useState<string | null>(
     () => localStorage.getItem(`kuber_profile_photo_${loginId}`) || null,
@@ -197,7 +421,6 @@ export default function DashboardLayout() {
     reader.readAsDataURL(file);
   };
 
-  // Detect if admin deactivated user while they're logged in
   const wasDeactivatedByAdmin =
     !isAdmin && userActivation?.deactivatedByAdmin === true;
 
@@ -212,18 +435,24 @@ export default function DashboardLayout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem(welcomeKey);
+    logout();
+  };
+
+  // Show email registration modal if needed
+  if (needsEmailRegistration) {
+    return <EmailRegistrationModal />;
+  }
+
   return (
     <div className="official-panel flex flex-col h-screen overflow-hidden">
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
 
-      {/* Admin deactivation notice */}
       {wasDeactivatedByAdmin && (
         <div
           className="fixed top-0 left-0 right-0 z-[998] px-4 py-2 text-center text-xs font-bold"
-          style={{
-            background: "oklch(0.5 0.2 25)",
-            color: "white",
-          }}
+          style={{ background: "oklch(0.5 0.2 25)", color: "white" }}
         >
           Your account has been deactivated by admin. Contact admin for
           re-activation code.
@@ -273,7 +502,6 @@ export default function DashboardLayout() {
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
-
               {menuOpen && (
                 <div
                   className="absolute left-0 top-full mt-2 z-50 overflow-hidden"
@@ -282,8 +510,7 @@ export default function DashboardLayout() {
                     background: "oklch(0.09 0.01 220)",
                     border: "1px solid oklch(0.65 0.2 220 / 25%)",
                     borderRadius: "12px",
-                    boxShadow:
-                      "0 16px 48px oklch(0 0 0 / 70%), 0 0 0 1px oklch(0.65 0.2 220 / 10%)",
+                    boxShadow: "0 16px 48px oklch(0 0 0 / 70%)",
                   }}
                 >
                   <div
@@ -294,9 +521,13 @@ export default function DashboardLayout() {
                     }}
                   >
                     <img
-                      src={LOGO}
+                      src={LOGO1}
                       alt="Kuber Panel"
                       className="w-7 h-7 flex-shrink-0"
+                      loading="eager"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = LOGO2;
+                      }}
                     />
                     <div>
                       <div className="font-black text-xs tracking-widest shimmer-text">
@@ -310,7 +541,6 @@ export default function DashboardLayout() {
                       </div>
                     </div>
                   </div>
-
                   <div
                     className="overflow-y-auto"
                     style={{ maxHeight: "60vh" }}
@@ -352,7 +582,6 @@ export default function DashboardLayout() {
                         </span>
                       </button>
                     ))}
-
                     {isAdmin && (
                       <>
                         <div
@@ -394,7 +623,6 @@ export default function DashboardLayout() {
                         ))}
                       </>
                     )}
-
                     <div
                       style={{
                         borderTop: "1px solid oklch(0.65 0.2 220 / 15%)",
@@ -405,7 +633,7 @@ export default function DashboardLayout() {
                         type="button"
                         onClick={() => {
                           setMenuOpen(false);
-                          logout();
+                          handleLogout();
                         }}
                         data-ocid="sidebar.logout_button"
                         className="w-full flex items-center gap-3 px-4 py-3 transition-all duration-150"
@@ -416,7 +644,6 @@ export default function DashboardLayout() {
                       </button>
                     </div>
                   </div>
-
                   <div
                     className="mx-3 mb-3 mt-1 px-3 py-2 rounded-lg flex items-center gap-2"
                     style={{
@@ -433,7 +660,6 @@ export default function DashboardLayout() {
               )}
             </div>
           )}
-
           {!isOnDashboard && CurrentIcon && (
             <div className="flex items-center gap-2">
               <div
@@ -453,7 +679,6 @@ export default function DashboardLayout() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Activation status badge */}
           {!isAdmin && (
             <div
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full"
@@ -478,7 +703,6 @@ export default function DashboardLayout() {
               </span>
             </div>
           )}
-
           <div className="relative" ref={profileRef}>
             <button
               type="button"
@@ -523,10 +747,10 @@ export default function DashboardLayout() {
                 </div>
               )}
             </button>
-
             {profileOpen && (
               <div
                 className="absolute right-0 top-full mt-2 z-50"
+                data-ocid="header.user.panel"
                 style={{
                   width: "240px",
                   background: "oklch(0.09 0.01 220)",
@@ -534,7 +758,6 @@ export default function DashboardLayout() {
                   borderRadius: "14px",
                   boxShadow: "0 16px 48px oklch(0 0 0 / 70%)",
                 }}
-                data-ocid="header.user.panel"
               >
                 <div
                   className="px-4 py-4 flex flex-col items-center text-center"
@@ -556,7 +779,7 @@ export default function DashboardLayout() {
                       className="w-14 h-14 rounded-full flex items-center justify-center mb-3 gold-glow"
                       style={{
                         background:
-                          "linear-gradient(135deg, oklch(0.65 0.2 220 / 30%), oklch(0.75 0.17 85 / 20%))",
+                          "linear-gradient(135deg,oklch(0.65 0.2 220 / 30%),oklch(0.75 0.17 85 / 20%))",
                         border: "2px solid oklch(0.75 0.17 85 / 40%)",
                       }}
                     >
@@ -614,7 +837,6 @@ export default function DashboardLayout() {
                     </div>
                   )}
                 </div>
-
                 <div className="px-4 py-3">
                   <div
                     className="text-[9px] uppercase tracking-[0.15em] mb-1 font-semibold"
@@ -629,7 +851,6 @@ export default function DashboardLayout() {
                     {loginId}
                   </div>
                 </div>
-
                 <div
                   className="px-3 pb-3"
                   style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 12%)" }}
@@ -638,7 +859,7 @@ export default function DashboardLayout() {
                     type="button"
                     onClick={() => {
                       setProfileOpen(false);
-                      logout();
+                      handleLogout();
                     }}
                     data-ocid="header.logout_button"
                     className="w-full flex items-center justify-center gap-2 mt-3 py-2 rounded-lg text-xs font-medium transition-all"
@@ -666,15 +887,14 @@ export default function DashboardLayout() {
         ) : (
           <div className="p-4">{renderSectionContent(activeSection)}</div>
         )}
-
         {isOnDashboard && (
           <footer
             className="px-6 py-3 text-center"
             style={{ borderTop: "1px solid oklch(0.65 0.2 220 / 10%)" }}
           >
             <p className="text-[10px] text-gray-600">
-              © {new Date().getFullYear()} KUBER PANEL · Licensed Financial
-              Dashboard
+              &copy; {new Date().getFullYear()} KUBER PANEL &middot; Licensed
+              Financial Dashboard
             </p>
           </footer>
         )}

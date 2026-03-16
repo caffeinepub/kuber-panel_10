@@ -13,6 +13,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
+import {
+  isSelfValidatingCode,
+  redeemSelfValidatingCode,
+} from "../../utils/SelfValidatingCode";
 
 const FUND_INFO = [
   { key: "gaming", label: "Gaming Fund", Icon: Gamepad2, color: "#7c3aed" },
@@ -23,38 +27,67 @@ const FUND_INFO = [
 ];
 
 export default function ActivationPanel() {
-  const { userActivation, activatedFunds, refresh } = useApp();
+  const { activatedFunds, userActivation, refresh } = useApp();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const email = localStorage.getItem("kuber_user_email") ?? "";
   const isDeactivatedByAdmin =
     userActivation?.deactivatedByAdmin === true && !userActivation?.isActive;
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) {
       toast.error("Please enter the activation code");
       return;
     }
+    const email =
+      localStorage.getItem("kuber_logged_in_user") ||
+      localStorage.getItem("kuber_user_email") ||
+      "";
+    if (!email) {
+      toast.error("Please login first");
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      const result = LocalStore.redeemCode(trimmed, email);
-      if (result.success && result.fundType) {
-        LocalStore.activateFundForUser(email, result.fundType, trimmed);
-        const fundLabel =
-          FUND_INFO.find((f) => f.key === result.fundType)?.label ||
-          result.fundType;
-        toast.success(`${fundLabel} activated successfully!`);
-        setCode("");
-        refresh();
+    try {
+      let fundType: string | undefined;
+
+      // Try self-validating code first
+      if (isSelfValidatingCode(trimmed)) {
+        const result = redeemSelfValidatingCode(trimmed);
+        if (!result.success) {
+          toast.error("This activation code has already been used.");
+          return;
+        }
+        fundType = result.fundType;
       } else {
-        toast.error(
-          "Invalid or already used activation code. Please check and try again.",
-        );
+        // Try localStorage code
+        const result = LocalStore.redeemCode(trimmed, email);
+        if (!result.success) {
+          toast.error(
+            "Invalid or already used activation code. Please check and try again.",
+          );
+          return;
+        }
+        fundType = result.fundType;
       }
+
+      if (!fundType) {
+        toast.error("Invalid activation code format.");
+        return;
+      }
+
+      LocalStore.activateFundForUser(email, fundType, trimmed);
+      const fundLabel =
+        FUND_INFO.find((f) => f.key === fundType)?.label || "Fund";
+      toast.success(`${fundLabel} activated successfully!`);
+      setCode("");
+      refresh();
+    } catch {
+      toast.error("Activation failed. Please try again.");
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   const hasAnyActivation = activatedFunds.length > 0;
@@ -68,7 +101,6 @@ export default function ActivationPanel() {
         </p>
       </div>
 
-      {/* Deactivated by admin notice */}
       {isDeactivatedByAdmin && (
         <div
           className="rounded-xl p-4 flex items-start gap-3"
@@ -89,14 +121,12 @@ export default function ActivationPanel() {
               Account Deactivated by Admin
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              Your account was deactivated. Get a new activation code from admin
-              to re-activate.
+              Get a new activation code from admin to re-activate.
             </div>
           </div>
         </div>
       )}
 
-      {/* Fund status grid */}
       {hasAnyActivation && (
         <div className="space-y-2">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -157,7 +187,6 @@ export default function ActivationPanel() {
         </div>
       )}
 
-      {/* Activation form */}
       <div
         data-ocid="activation.panel"
         className="dark-card rounded-2xl p-6 space-y-5"
@@ -182,20 +211,19 @@ export default function ActivationPanel() {
             Each fund requires its own activation code from admin
           </div>
         </div>
-
         <div className="space-y-3">
           <input
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === "Enter" && handleActivate()}
-            placeholder="KP-XXXXXX"
+            placeholder="Enter activation code"
             data-ocid="activation.code.input"
-            className="w-full px-4 py-3 rounded-xl text-center text-lg font-mono font-bold text-white placeholder-gray-600 outline-none"
+            className="w-full px-4 py-3 rounded-xl text-center text-base font-mono font-bold text-white placeholder-gray-600 outline-none"
             style={{
               background: "oklch(0.07 0 0)",
               border: "1px solid oklch(0.75 0.15 85 / 30%)",
-              letterSpacing: "0.2em",
+              letterSpacing: "0.15em",
             }}
           />
           <button
@@ -209,7 +237,6 @@ export default function ActivationPanel() {
             {loading ? "Activating..." : "Activate Fund"}
           </button>
         </div>
-
         <div
           className="text-center text-xs text-gray-600 px-4 py-3 rounded-lg space-y-1"
           style={{ background: "oklch(0.07 0 0)" }}

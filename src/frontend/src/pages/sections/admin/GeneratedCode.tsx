@@ -9,10 +9,11 @@ import {
   TrendingUp,
   Vote,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import * as LocalStore from "../../../utils/LocalStore";
 import type { ActivationCodeLS } from "../../../utils/LocalStore";
+import { generateSelfValidatingCode } from "../../../utils/SelfValidatingCode";
 
 const fundOptions = [
   {
@@ -48,38 +49,55 @@ const fundOptions = [
 ];
 
 export default function GeneratedCode() {
-  const [codes, setCodes] = useState<ActivationCodeLS[]>(() =>
-    LocalStore.getActivationCodes(),
-  );
+  const [codes, setCodes] = useState<ActivationCodeLS[]>([]);
+  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
   const [latestCode, setLatestCode] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
 
-  const handleGenerate = (fundType: string) => {
+  const loadCodes = useCallback(() => {
+    setCodes(LocalStore.getActivationCodes());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadCodes();
+  }, [loadCodes]);
+
+  const handleGenerate = async (fundType: string) => {
     setGenerating(fundType);
-    setTimeout(() => {
-      try {
-        const entry = LocalStore.generateCode(fundType);
-        setCodes(LocalStore.getActivationCodes());
-        setLatestCode((p) => ({ ...p, [fundType]: entry.code }));
-        toast.success(`Code generated: ${entry.code}`);
-      } catch {
-        toast.error("Failed to generate code");
-      } finally {
-        setGenerating(null);
-      }
-    }, 300);
+    try {
+      // Generate a self-validating code for cross-device use
+      const svCode = generateSelfValidatingCode(fundType);
+      // Save to localStorage
+      const allCodes = LocalStore.getActivationCodes();
+      const entry: ActivationCodeLS = {
+        code: svCode,
+        fundType,
+        createdAt: new Date().toISOString(),
+        isActive: true,
+      };
+      allCodes.unshift(entry);
+      LocalStore.saveActivationCodes(allCodes);
+      setLatestCode((p) => ({ ...p, [fundType]: svCode }));
+      toast.success(`Code generated: ${svCode}`);
+      loadCodes();
+    } catch {
+      toast.error("Failed to generate code");
+    } finally {
+      setGenerating(null);
+    }
   };
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code).catch(() => {});
     setCopied(code);
-    toast.success("Code copied to clipboard!");
+    toast.success("Code copied!");
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-IN", {
+  const fmtDate = (createdAt: string) =>
+    new Date(createdAt).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -94,7 +112,6 @@ export default function GeneratedCode() {
         </p>
       </div>
 
-      {/* Generate buttons */}
       <div className="grid grid-cols-1 gap-3">
         {fundOptions.map(({ key, label, Icon, color }) => (
           <div
@@ -107,11 +124,11 @@ export default function GeneratedCode() {
                 <div
                   className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: `${color} / 15%`,
-                    border: `1px solid ${color} / 25%`,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
                   }}
                 >
-                  <Icon className="w-4.5 h-4.5" style={{ color }} />
+                  <Icon className="w-4 h-4" style={{ color }} />
                 </div>
                 <div>
                   <div className="font-semibold text-white text-sm">
@@ -128,7 +145,7 @@ export default function GeneratedCode() {
                       <button
                         type="button"
                         onClick={() => handleCopy(latestCode[key])}
-                        className="text-gray-500 hover:text-white transition-colors"
+                        className="text-gray-500 hover:text-white"
                         data-ocid={`generated_code.${key}.copy_button`}
                       >
                         {copied === latestCode[key] ? (
@@ -163,13 +180,17 @@ export default function GeneratedCode() {
         ))}
       </div>
 
-      {/* All codes table */}
       <div>
         <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">
           All Codes ({codes.length})
         </h3>
         <div className="dark-card rounded-xl overflow-hidden">
-          {codes.length === 0 ? (
+          {loading ? (
+            <div className="py-10 flex items-center justify-center gap-2 text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm">Loading codes...</span>
+            </div>
+          ) : codes.length === 0 ? (
             <div
               data-ocid="generated_code.empty_state"
               className="py-10 text-center text-gray-600 text-sm"
@@ -185,14 +206,7 @@ export default function GeneratedCode() {
                       borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)",
                     }}
                   >
-                    {[
-                      "Code",
-                      "Fund",
-                      "Created",
-                      "Status",
-                      "Used By",
-                      "Copy",
-                    ].map((h) => (
+                    {["Code", "Fund", "Created", "Status", "Copy"].map((h) => (
                       <th
                         key={h}
                         className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
@@ -248,16 +262,11 @@ export default function GeneratedCode() {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <span className="text-xs text-gray-500 truncate max-w-[100px] block">
-                          {c.usedByEmail ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
                         {c.isActive && (
                           <button
                             type="button"
                             onClick={() => handleCopy(c.code)}
-                            className="text-gray-500 hover:text-white transition-colors"
+                            className="text-gray-500 hover:text-white"
                             data-ocid={`generated_code.copy_button.${i + 1}`}
                           >
                             {copied === c.code ? (

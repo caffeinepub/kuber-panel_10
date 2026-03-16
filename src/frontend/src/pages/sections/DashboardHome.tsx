@@ -20,6 +20,10 @@ import { useApp } from "../../context/AppContext";
 
 const LOGO = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
 
+// Preload logo immediately
+const preloadImg = new window.Image();
+preloadImg.src = LOGO;
+
 const GENERAL_ACTIVATION_REQUIRED = new Set([
   "add-bank",
   "bank-statement",
@@ -220,12 +224,10 @@ export default function DashboardHome() {
               opacity: locked ? 0.5 : 1,
             }}
           >
-            {/* Top accent line */}
             <div
               className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
               style={{ background: locked ? "#222" : accent }}
             />
-            {/* Icon */}
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 flex-shrink-0"
               style={{ background: locked ? "rgba(255,255,255,0.04)" : iconBg }}
@@ -236,7 +238,6 @@ export default function DashboardHome() {
                 <Icon className="w-5 h-5" style={{ color: accent }} />
               )}
             </div>
-            {/* Text */}
             <div className="mt-auto">
               <div
                 className="text-sm font-bold leading-tight truncate w-full"
@@ -280,8 +281,9 @@ export default function DashboardHome() {
           alt="Kuber Panel"
           className="flex-shrink-0 drop-shadow-lg relative z-10"
           style={{ width: 72, height: 72 }}
+          loading="eager"
         />
-        <div className="relative z-10 flex-1">
+        <div className="relative z-10 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-lg font-black tracking-widest shimmer-text">
               KUBER PANEL
@@ -297,14 +299,12 @@ export default function DashboardHome() {
               OFFICIAL
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {isAdmin
-              ? "Panel Active — Fund Management Dashboard"
-              : isActivated
-                ? "Panel Active — Fund Management Dashboard"
-                : "Panel Not Activated"}
+          <p className="text-xs text-gray-400 mt-0.5 truncate">
+            {isAdmin || isActivated
+              ? "Start New Journey"
+              : "Panel Not Activated"}
           </p>
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <div
               className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold"
               style={{
@@ -359,42 +359,6 @@ export default function DashboardHome() {
           />
         </div>
         <CardGrid items={dashboardOptions} />
-      </div>
-
-      {/* Start New Journey Banner */}
-      <div
-        className="rounded-2xl px-5 py-4 relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #0a1428 0%, #000000 100%)",
-          border: "1px solid rgba(59,130,246,0.25)",
-        }}
-      >
-        <div
-          className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
-          style={{
-            background: "linear-gradient(90deg, #3b82f6, #a855f7, #3b82f6)",
-          }}
-        />
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-white">Start New Journey</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Activate a new fund and begin earning commission
-            </p>
-          </div>
-          <button
-            type="button"
-            data-ocid="dashboard.start_journey.button"
-            onClick={() => setActiveSection("activation" as any)}
-            className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-black"
-            style={{
-              background: "linear-gradient(135deg, #3b82f6, #a855f7)",
-              color: "#fff",
-            }}
-          >
-            🚀 Start
-          </button>
-        </div>
       </div>
 
       {/* Admin Panel Cards */}
