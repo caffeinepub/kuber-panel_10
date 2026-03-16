@@ -1,0 +1,247 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;800&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --background: 0.06 0 0;
+    --foreground: 0.97 0 0;
+    --card: 0.09 0 0;
+    --card-foreground: 0.97 0 0;
+    --popover: 0.12 0 0;
+    --popover-foreground: 0.97 0 0;
+    --primary: 0.65 0.2 220;
+    --primary-foreground: 0.06 0 0;
+    --secondary: 0.14 0 0;
+    --secondary-foreground: 0.97 0 0;
+    --muted: 0.14 0 0;
+    --muted-foreground: 0.55 0 0;
+    --accent: 0.65 0.2 220;
+    --accent-foreground: 0.06 0 0;
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.97 0 0;
+    --border: 0.65 0.2 220 / 18%;
+    --input: 0.65 0.2 220 / 15%;
+    --ring: 0.65 0.2 220;
+    --sidebar: 0.07 0 0;
+    --sidebar-foreground: 0.97 0 0;
+    --sidebar-primary: 0.65 0.2 220;
+    --sidebar-primary-foreground: 0.06 0 0;
+    --sidebar-accent: 0.65 0.2 220 / 15%;
+    --sidebar-accent-foreground: 0.97 0 0;
+    --sidebar-border: 0.65 0.2 220 / 15%;
+    --sidebar-ring: 0.65 0.2 220;
+    --chart-1: 0.65 0.2 220;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.398 0.07 227.392;
+    --chart-4: 0.75 0.18 200;
+    --chart-5: 0.55 0.18 240;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* Cyan-blue custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: oklch(0.08 0 0);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.65 0.2 220 / 35%);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.65 0.2 220 / 60%);
+  }
+}
+
+/* ===== ACCENT TEXT & EFFECTS ===== */
+.accent-text {
+  color: oklch(0.65 0.2 220);
+}
+
+/* Backward compat alias */
+.gold-text {
+  color: oklch(0.65 0.2 220);
+}
+
+.gold-border {
+  border-color: oklch(0.65 0.2 220 / 40%);
+}
+
+.gold-bg {
+  background: oklch(0.65 0.2 220);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, oklch(0.75 0.18 200), oklch(0.55 0.18 240));
+}
+
+.dark-card {
+  background: oklch(0.09 0 0);
+  border: 1px solid oklch(0.65 0.2 220 / 25%);
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar-item {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200;
+  position: relative;
+}
+
+.sidebar-item:hover {
+  background: oklch(0.65 0.2 220 / 12%);
+  color: oklch(0.85 0.18 210);
+}
+
+.sidebar-item.active {
+  background: oklch(0.65 0.2 220 / 18%);
+  color: oklch(0.85 0.18 210);
+  border-left: 3px solid oklch(0.65 0.2 220);
+  box-shadow: inset 0 0 24px oklch(0.65 0.2 220 / 8%);
+}
+
+/* ===== BOX CARD (dashboard option boxes) ===== */
+.box-card {
+  @apply rounded-2xl transition-all duration-300 cursor-pointer;
+  background: oklch(0.09 0 0);
+  border: 1px solid oklch(0.65 0.2 220 / 20%);
+  box-shadow: 0 2px 12px oklch(0 0 0 / 40%);
+}
+
+.box-card:hover {
+  transform: translateY(-2px) scale(1.025);
+  border-color: oklch(0.65 0.2 220 / 55%);
+  box-shadow: 0 6px 28px oklch(0.65 0.2 220 / 18%), 0 0 0 1px oklch(0.65 0.2 220 / 30%);
+}
+
+/* ===== PREMIUM STAT CARDS ===== */
+.stat-card {
+  @apply rounded-xl p-5;
+  background: oklch(0.09 0 0);
+  border: 1px solid oklch(0.65 0.2 220 / 22%);
+  box-shadow: 0 2px 10px oklch(0 0 0 / 40%);
+}
+
+.premium-stat {
+  @apply rounded-xl p-5 relative overflow-hidden;
+  background: oklch(0.09 0 0);
+  box-shadow: 0 2px 16px oklch(0 0 0 / 50%);
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+
+.premium-stat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 4px 0 0 4px;
+}
+
+.premium-stat.gold::before  { background: oklch(0.65 0.2 220); }
+.premium-stat.blue::before  { background: oklch(0.55 0.2 265); }
+.premium-stat.red::before   { background: oklch(0.55 0.22 27); }
+.premium-stat.green::before { background: oklch(0.62 0.2 145); }
+
+.premium-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px oklch(0 0 0 / 60%);
+}
+
+/* ===== FUND CARD ===== */
+.fund-card {
+  @apply rounded-xl p-4;
+  background: oklch(0.1 0 0);
+  border: 1px solid oklch(0.65 0.2 220 / 30%);
+}
+
+/* ===== TABLE ===== */
+.table-row-hover:hover {
+  background: oklch(0.65 0.2 220 / 6%);
+}
+
+/* ===== OFFICIAL PANEL CLASS ===== */
+.official-panel {
+  background: oklch(0.06 0 0);
+  min-height: 100vh;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ===== ACCENT GLOW ANIMATION ===== */
+@keyframes gold-glow {
+  0%, 100% {
+    box-shadow: 0 0 6px oklch(0.65 0.2 220 / 30%), 0 0 0 1px oklch(0.65 0.2 220 / 20%);
+  }
+  50% {
+    box-shadow: 0 0 18px oklch(0.65 0.2 220 / 60%), 0 0 0 1px oklch(0.65 0.2 220 / 50%);
+  }
+}
+
+.gold-glow {
+  animation: gold-glow 2.5s ease-in-out infinite;
+}
+
+/* ===== PULSE DOT ===== */
+@keyframes pulse-gold {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}
+
+.pulse-gold {
+  animation: pulse-gold 2s ease-in-out infinite;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-gold 1.5s ease-in-out infinite;
+  box-shadow: 0 0 6px #22c55e88;
+}
+
+/* ===== SHIMMER ANIMATION ===== */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    oklch(0.65 0.2 220) 0%,
+    oklch(0.80 0.18 200) 40%,
+    oklch(0.65 0.2 220) 60%,
+    oklch(0.5 0.15 240) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ===== TOP ACCENT STRIPE ===== */
+.gold-top-stripe {
+  height: 3px;
+  background: linear-gradient(90deg, oklch(0.45 0.2 270), oklch(0.65 0.2 220), oklch(0.75 0.15 185), oklch(0.65 0.2 220), oklch(0.45 0.2 270));
+  background-size: 200% auto;
+  animation: shimmer 5s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
