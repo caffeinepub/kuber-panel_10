@@ -623,15 +623,7 @@ export default function DashboardLayout() {
           >
             <p className="text-[10px] text-gray-600">
               © {new Date().getFullYear()} KUBER PANEL · Licensed Financial
-              Dashboard ·{" "}
-              <a
-                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-400 transition-colors"
-              >
-                Built with ♥ using caffeine.ai
-              </a>
+              Dashboard
             </p>
           </footer>
         )}

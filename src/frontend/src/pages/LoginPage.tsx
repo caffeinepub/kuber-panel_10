@@ -4,8 +4,7 @@ import * as LocalStore from "../utils/LocalStore";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 const ADMIN_PASSWORD = "Admin@123";
-const LOGO = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
-const LOGO2 = "/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png";
+const LOGO = "/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png";
 
 interface LoginPageProps {
   onLogin: (email: string) => void;
@@ -14,129 +13,76 @@ interface LoginPageProps {
 function WelcomePopup({
   type,
   onClose,
-}: { type: "login" | "register"; onClose: () => void }) {
+}: {
+  type: "login" | "register";
+  onClose: () => void;
+}) {
   useEffect(() => {
-    const t = setTimeout(onClose, 2500);
+    const t = setTimeout(onClose, 2800);
     return () => clearTimeout(t);
   }, [onClose]);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.92)" }}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{ background: "#000000" }}
       data-ocid="welcome.modal"
     >
-      {/* Animated rings */}
-      <div
-        className="absolute"
+      <img
+        src="/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png"
+        alt="Kuber Panel"
         style={{
-          width: 280,
-          height: 280,
-          borderRadius: "50%",
-          border: "1px solid rgba(212,160,23,0.15)",
-          animation: "ping 2s ease-out infinite",
+          width: 130,
+          height: 130,
+          objectFit: "contain",
+          filter: "drop-shadow(0 0 24px rgba(212,160,23,0.5))",
+          marginBottom: 24,
         }}
       />
       <div
-        className="absolute"
+        className="text-2xl font-black tracking-[0.25em] mb-1"
         style={{
-          width: 220,
-          height: 220,
-          borderRadius: "50%",
-          border: "1px solid rgba(212,160,23,0.25)",
-          animation: "ping 2s ease-out infinite 0.3s",
-        }}
-      />
-
-      <div
-        className="relative text-center px-8 py-10 rounded-3xl"
-        style={{
-          background: "linear-gradient(145deg, #0a0a0a, #111)",
-          border: "1px solid rgba(212,160,23,0.4)",
-          boxShadow:
-            "0 0 60px rgba(212,160,23,0.15), 0 0 120px rgba(0,0,0,0.8)",
-          minWidth: 280,
-          maxWidth: 320,
+          background: "linear-gradient(135deg, #f0c040, #d4a017, #f0c040)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          backgroundClip: "text",
         }}
       >
-        {/* Top gold stripe */}
-        <div
-          className="absolute top-0 left-6 right-6 h-[1px]"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, #d4a017, transparent)",
-          }}
-        />
-
-        {/* Logos */}
-        <div className="flex items-center justify-center gap-3 mb-5">
-          <img
-            src={LOGO}
-            alt="Kuber"
-            className="w-16 h-16 drop-shadow-2xl"
-            style={{ filter: "drop-shadow(0 0 16px rgba(212,160,23,0.6))" }}
-          />
-          <img
-            src={LOGO2}
-            alt="Kuber"
-            className="w-14 h-14 drop-shadow-2xl"
+        KUBER PANEL
+      </div>
+      <div className="text-sm text-gray-400 mb-6">
+        {type === "login"
+          ? "Signing in securely..."
+          : "Creating your account..."}
+      </div>
+      <div className="flex items-center gap-2">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
             style={{
-              filter: "drop-shadow(0 0 12px rgba(212,160,23,0.4))",
-              opacity: 0.85,
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#d4a017",
+              animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
             }}
           />
-        </div>
-
-        {/* Brand */}
+        ))}
+      </div>
+      <div
+        className="mt-8 px-5 py-2 rounded-full flex items-center gap-2"
+        style={{
+          background: "rgba(22,163,74,0.12)",
+          border: "1px solid rgba(22,163,74,0.3)",
+        }}
+      >
         <div
-          className="text-2xl font-black tracking-[0.2em] mb-1"
-          style={{
-            background: "linear-gradient(135deg, #f0c040, #d4a017, #f0c040)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >
-          KUBER PANEL
-        </div>
-        <div className="text-[10px] text-gray-500 tracking-[0.15em] uppercase mb-5">
-          Official Financial Platform
-        </div>
-
-        {/* Status message */}
-        <div
-          className="px-4 py-2 rounded-full mb-4 inline-flex items-center gap-2"
-          style={{
-            background: "rgba(22,163,74,0.12)",
-            border: "1px solid rgba(22,163,74,0.3)",
-          }}
-        >
-          <div
-            className="w-2 h-2 rounded-full bg-green-500"
-            style={{ animation: "pulse 1s ease-in-out infinite" }}
-          />
-          <span className="text-xs font-bold text-green-400">
-            {type === "login" ? "LOGIN SUCCESSFUL" : "REGISTRATION SUCCESSFUL"}
-          </span>
-        </div>
-
-        <div className="text-sm font-bold text-white mb-1">
-          {type === "login" ? "Welcome Back!" : "Account Created!"}
-        </div>
-        <div className="text-xs text-gray-500">
-          {type === "login"
-            ? "Redirecting to your panel..."
-            : "Please login to continue"}
-        </div>
-
-        {/* Bottom gold stripe */}
-        <div
-          className="absolute bottom-0 left-6 right-6 h-[1px]"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, #d4a017, transparent)",
-          }}
+          className="w-2 h-2 rounded-full bg-green-500"
+          style={{ animation: "pulse 1s ease-in-out infinite" }}
         />
+        <span className="text-xs font-bold text-green-400">
+          {type === "login" ? "LOGIN SUCCESSFUL" : "REGISTRATION SUCCESSFUL"}
+        </span>
       </div>
     </div>
   );

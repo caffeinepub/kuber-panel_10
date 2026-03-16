@@ -171,11 +171,11 @@ function generateReceiptHTML(
     )
     .join("");
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Transaction Receipt — KUBER PANEL</title>
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Withdrawal Receipt — KUBER PANEL</title>
 <style>body{font-family:Arial,sans-serif;max-width:420px;margin:40px auto;padding:24px;background:#0a0f1e;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:12px;}
 h2{text-align:center;color:#60a5fa;letter-spacing:4px;margin-bottom:4px;} .sub{text-align:center;color:#64748b;font-size:12px;margin-bottom:12px;} .badge{text-align:center;background:rgba(22,163,74,0.15);color:#4ade80;padding:4px 16px;border-radius:20px;display:inline-block;font-weight:bold;margin:8px auto 16px;border:1px solid rgba(22,163,74,0.35);width:fit-content;display:block;} .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;} .label{color:#64748b;} .val{font-weight:600;font-family:monospace;text-align:right;max-width:58%;word-break:break-all;} .footer{text-align:center;color:#374151;font-size:10px;margin-top:16px;}
 </style></head><body>
-<h2>KUBER PANEL</h2><p class="sub">Transaction Receipt</p><p class="badge">✓ SUCCESS</p>
+<h2>KUBER PANEL</h2><p class="sub">Withdrawal Receipt</p><p class="badge">✓ SUCCESS</p>
 ${rowsHTML}
 <div class="footer">This is a computer-generated receipt. KUBER PANEL Official Platform.</div>
 </body></html>`;
@@ -379,7 +379,7 @@ export default function WithdrawalHistory() {
                     KUBER PANEL
                   </div>
                   <div className="text-[10px] text-gray-500">
-                    Transaction Receipt
+                    Withdrawal Receipt
                   </div>
                 </div>
               </div>

@@ -111,7 +111,7 @@ export default function MyCommission() {
                 data-ocid={`commission.item.${i + 1}`}
                 className="rounded-xl p-4"
                 style={{
-                  background: `${color}0a`,
+                  background: "#000000",
                   border: `1px solid ${color}25`,
                 }}
               >
