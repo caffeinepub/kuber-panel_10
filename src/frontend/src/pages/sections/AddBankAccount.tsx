@@ -6,11 +6,12 @@ import {
   Eye,
   KeyRound,
   Plus,
+  QrCode,
   Trash2,
   X,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
@@ -48,7 +49,7 @@ const emptyForm = {
   internetBankingPassword: "",
   upiId: "",
   qrCodeUrl: "",
-  fundType: "gaming", // kept in data model for compatibility but hidden from UI
+  fundType: "gaming",
 };
 
 export default function AddBankAccount() {
@@ -60,6 +61,7 @@ export default function AddBankAccount() {
   const [editId, setEditId] = useState<string | null>(null);
   const [viewAccount, setViewAccount] = useState<BankAccountLS | null>(null);
   const [loading, setLoading] = useState(false);
+  const qrInputRef = useRef<HTMLInputElement>(null);
 
   const triggerRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -94,6 +96,22 @@ export default function AddBankAccount() {
       </div>
     );
   }
+
+  const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setForm((p) => ({ ...p, qrCodeUrl: dataUrl }));
+      toast.success("QR code uploaded");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = () => {
     if (!form.bankName || !form.accountNumber || !form.ifscCode) {
@@ -199,6 +217,7 @@ export default function AddBankAccount() {
             {editId ? "Edit Bank Account" : "New Bank Account"}
           </h3>
           <div className="grid grid-cols-1 gap-3">
+            {/* Account Type */}
             <div>
               <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
                 Account Type
@@ -217,8 +236,10 @@ export default function AddBankAccount() {
               >
                 <option value="Saving">Saving Account</option>
                 <option value="Current">Current Account</option>
+                <option value="Corporate">Corporate Account</option>
               </select>
             </div>
+
             {field("Bank Name *", "bankName")}
             {field("Account Holder Name *", "accountHolderName")}
             {field("Account Number *", "accountNumber")}
@@ -231,8 +252,62 @@ export default function AddBankAccount() {
               "password",
             )}
             {field("UPI ID", "upiId")}
-            {/* fundType select removed - not needed by user */}
+
+            {/* QR Code Upload */}
+            <div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                QR Code (Optional)
+              </div>
+              <input
+                ref={qrInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                data-ocid="add_bank.qr_upload_button"
+                onChange={handleQrUpload}
+              />
+              <button
+                type="button"
+                onClick={() => qrInputRef.current?.click()}
+                data-ocid="add_bank.qr_select_button"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                style={{
+                  background: form.qrCodeUrl
+                    ? "oklch(0.15 0.04 145)"
+                    : "oklch(0.13 0 0)",
+                  border: form.qrCodeUrl
+                    ? "1px solid oklch(0.6 0.2 145 / 40%)"
+                    : "1px dashed oklch(0.75 0.15 85 / 30%)",
+                  color: form.qrCodeUrl
+                    ? "oklch(0.75 0.2 145)"
+                    : "oklch(0.65 0.1 85)",
+                }}
+              >
+                <QrCode className="w-4 h-4" />
+                {form.qrCodeUrl
+                  ? "QR Code Uploaded ✓"
+                  : "Upload QR Code from Gallery"}
+              </button>
+              {form.qrCodeUrl && (
+                <div className="mt-2 flex items-center gap-3">
+                  <img
+                    src={form.qrCodeUrl}
+                    alt="QR Code"
+                    className="w-16 h-16 rounded-lg object-contain"
+                    style={{ background: "#fff", padding: 4 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, qrCodeUrl: "" }))}
+                    className="text-xs text-red-400 underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
+
           <button
             type="button"
             onClick={handleSubmit}
@@ -296,8 +371,25 @@ export default function AddBankAccount() {
                     <div className="text-xs font-mono text-gray-600 mt-0.5">
                       Acc: {acc.accountNumber} | IFSC: {acc.ifscCode}
                     </div>
+                    {acc.accountType && (
+                      <div className="text-[10px] text-gray-600 mt-0.5">
+                        {acc.accountType} Account
+                      </div>
+                    )}
                   </button>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {acc.qrCodeUrl && (
+                      <div
+                        className="p-1.5 rounded-lg"
+                        title="QR Code available"
+                        style={{
+                          background: "oklch(0.6 0.2 145 / 12%)",
+                          color: "oklch(0.75 0.2 145)",
+                        }}
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => setViewAccount(acc)}
@@ -419,6 +511,20 @@ export default function AddBankAccount() {
                     </span>
                   </div>
                 ) : null,
+              )}
+              {/* QR Code preview in modal */}
+              {viewAccount.qrCodeUrl && (
+                <div className="pt-3">
+                  <div className="text-[11px] text-gray-500 mb-2">QR Code</div>
+                  <div className="flex justify-center">
+                    <img
+                      src={viewAccount.qrCodeUrl}
+                      alt="QR Code"
+                      className="w-32 h-32 rounded-xl object-contain"
+                      style={{ background: "#fff", padding: 8 }}
+                    />
+                  </div>
+                </div>
               )}
             </div>
           </div>

@@ -28,8 +28,8 @@ const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 export const COMMISSION_RATES: Record<string, number> = {
   gaming: 0.15,
   stock: 0.3,
-  mix: 0.3,
-  political: 0.25,
+  mix: 0.25,
+  political: 0.3,
   all: 0.2,
 };
 

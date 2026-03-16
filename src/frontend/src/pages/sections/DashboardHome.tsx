@@ -91,7 +91,7 @@ export default function DashboardHome() {
     {
       id: "political-fund",
       label: "Political Fund",
-      desc: "25% commission",
+      desc: "30% commission",
       Icon: Vote,
       bg: "#1a0808",
       accent: "#ef4444",
@@ -100,7 +100,7 @@ export default function DashboardHome() {
     {
       id: "mix-fund",
       label: "Mix Fund",
-      desc: "30% commission",
+      desc: "25% commission",
       Icon: Shuffle,
       bg: "#051418",
       accent: "#06b6d4",
