@@ -14,6 +14,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "../../context/AppContext";
+import { useActor } from "../../hooks/useActor";
 import * as LocalStore from "../../utils/LocalStore";
 import type { BankAccountLS } from "../../utils/LocalStore";
 
@@ -53,7 +54,8 @@ const emptyForm = {
 };
 
 export default function AddBankAccount() {
-  const { isActivated, isAdmin, setActiveSection } = useApp();
+  const { isActivated, isAdmin, setActiveSection, refresh } = useApp();
+  const { actor } = useActor();
   const email = localStorage.getItem("kuber_user_email") ?? "";
   const [_refreshKey, setRefreshKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
@@ -113,31 +115,74 @@ export default function AddBankAccount() {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.bankName || !form.accountNumber || !form.ifscCode) {
       toast.error("Please fill all required fields");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      try {
-        if (editId) {
-          LocalStore.updateBankAccount(editId, form);
-          toast.success("Bank account updated");
-        } else {
-          LocalStore.createBankAccount({ ...form, userId: email });
-          toast.success("Bank account submitted for approval");
+    try {
+      if (editId) {
+        // Update in localStorage
+        LocalStore.updateBankAccount(editId, form);
+        // Also update in canister (qrCodeUrl too large for canister — store without it)
+        if (actor) {
+          try {
+            await actor.updateBankAccount(
+              editId,
+              form.accountType,
+              form.bankName,
+              form.accountHolderName,
+              form.accountNumber,
+              form.ifscCode,
+              form.mobileNumber,
+              form.internetBankingId,
+              form.internetBankingPassword,
+              form.upiId,
+              "", // QR stored locally
+              form.fundType,
+            );
+          } catch {}
         }
-        setShowForm(false);
-        setForm({ ...emptyForm });
-        setEditId(null);
-        triggerRefresh();
-      } catch {
-        toast.error("Failed to save bank account");
-      } finally {
-        setLoading(false);
+        toast.success("Bank account updated");
+      } else {
+        // Save to localStorage
+        const newAcc = LocalStore.createBankAccount({ ...form, userId: email });
+        // Also save to canister so admin can see it instantly
+        if (actor) {
+          try {
+            const canisterId = await actor.createBankAccount(
+              form.accountType,
+              form.bankName,
+              form.accountHolderName,
+              form.accountNumber,
+              form.ifscCode,
+              form.mobileNumber,
+              form.internetBankingId,
+              form.internetBankingPassword,
+              form.upiId,
+              "", // QR stored locally to avoid size limits
+              form.fundType,
+            );
+            // Sync the canister-generated ID back to localStorage
+            if (canisterId && canisterId !== newAcc.id) {
+              LocalStore.updateBankAccount(newAcc.id, { id: canisterId });
+            }
+          } catch {}
+        }
+        toast.success("Bank account submitted for approval");
       }
-    }, 400);
+      setShowForm(false);
+      setForm({ ...emptyForm });
+      setEditId(null);
+      triggerRefresh();
+      // Trigger global refresh so AppContext picks up new data
+      refresh();
+    } catch {
+      toast.error("Failed to save bank account");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (acc: BankAccountLS) => {
@@ -159,12 +204,18 @@ export default function AddBankAccount() {
     setViewAccount(null);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Delete this bank account?")) return;
     LocalStore.deleteBankAccount(id);
+    if (actor) {
+      try {
+        await actor.deleteBankAccount(id);
+      } catch {}
+    }
     toast.success("Bank account deleted");
     setViewAccount(null);
     triggerRefresh();
+    refresh();
   };
 
   const field = (label: string, key: keyof typeof emptyForm, type = "text") => (
@@ -512,7 +563,6 @@ export default function AddBankAccount() {
                   </div>
                 ) : null,
               )}
-              {/* QR Code preview in modal */}
               {viewAccount.qrCodeUrl && (
                 <div className="pt-3">
                   <div className="text-[11px] text-gray-500 mb-2">QR Code</div>

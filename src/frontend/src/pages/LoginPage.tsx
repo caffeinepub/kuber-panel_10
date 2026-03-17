@@ -1,82 +1,13 @@
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import StableLogo from "../components/StableLogo";
 import * as LocalStore from "../utils/LocalStore";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 const ADMIN_PASSWORD = "Admin@123";
-const LOGO1 = "/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png";
-const LOGO2 = "/assets/uploads/IMG_20260311_153614_686-removebg-preview-2.png";
-
-// Eagerly preload logos
-(() => {
-  const a = new window.Image();
-  a.src = LOGO1;
-  const b = new window.Image();
-  b.src = LOGO2;
-})();
 
 interface LoginPageProps {
   onLogin: () => void;
-}
-
-function KuberLogo({ size = 90 }: { size?: number }) {
-  const [src, setSrc] = useState(LOGO1);
-  const [failed, setFailed] = useState(false);
-  return (
-    <div
-      style={{
-        position: "relative",
-        display: "inline-block",
-        width: size,
-        height: size,
-      }}
-    >
-      {!failed ? (
-        <img
-          src={src}
-          alt="KUBER PANEL"
-          loading="eager"
-          onError={() => {
-            if (src === LOGO1) setSrc(LOGO2);
-            else setFailed(true);
-          }}
-          style={{
-            display: "block",
-            width: size,
-            height: size,
-            objectFit: "contain",
-            filter: "drop-shadow(0 0 18px rgba(212,160,23,0.55))",
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: size,
-            height: size,
-            borderRadius: "50%",
-            background: "linear-gradient(135deg,#d4a017,#f0c040)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: size * 0.4,
-            fontWeight: 900,
-            color: "#000",
-          }}
-        >
-          K
-        </div>
-      )}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          boxShadow: "0 0 32px 8px rgba(212,160,23,0.28)",
-          pointerEvents: "none",
-        }}
-      />
-    </div>
-  );
 }
 
 function WelcomePopup({
@@ -84,71 +15,66 @@ function WelcomePopup({
   onClose,
 }: { type: "login" | "register"; onClose: () => void }) {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
+
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("hold"), 350);
-    const t2 = setTimeout(() => setPhase("out"), 2400);
-    const t3 = setTimeout(onClose, 2850);
+    const t2 = setTimeout(() => setPhase("out"), 2600);
+    const t3 = setTimeout(onClose, 3000);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
   }, [onClose]);
+
   const visible = phase !== "out";
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center"
       style={{
         background: "#000000",
         opacity: visible ? 1 : 0,
-        transition: "opacity 0.45s ease",
+        transition: "opacity 0.5s ease",
       }}
       data-ocid="welcome.modal"
     >
       <div
         style={{
-          transform: phase === "in" ? "scale(0.88)" : "scale(1)",
+          transform: phase === "in" ? "scale(0.85)" : "scale(1)",
           opacity: phase === "in" ? 0 : 1,
           transition:
-            "transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease",
+            "transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.45s ease",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
         }}
       >
-        <KuberLogo size={110} />
-        <div
-          className="text-2xl font-black tracking-[0.25em] mb-1 mt-6"
-          style={{
-            background: "linear-gradient(135deg,#f0c040,#d4a017,#f0c040)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >
+        <StableLogo size={110} spin glow />
+        <div className="text-2xl font-black tracking-[0.25em] mt-5 mb-1 shimmer-text">
           KUBER PANEL
         </div>
-        <div className="text-sm text-gray-400 mb-6">
+        <div className="text-sm text-gray-400 mb-5">
           {type === "login"
             ? "Signing in securely..."
             : "Creating your account..."}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-6">
           {[0, 1, 2].map((i) => (
             <div
               key={i}
               style={{
-                width: 8,
-                height: 8,
+                width: 9,
+                height: 9,
                 borderRadius: "50%",
-                background: "#d4a017",
+                background: "oklch(0.65 0.2 220)",
                 animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
               }}
             />
           ))}
         </div>
         <div
-          className="mt-8 px-5 py-2 rounded-full flex items-center gap-2"
+          className="px-5 py-2 rounded-full flex items-center gap-2"
           style={{
             background: "rgba(22,163,74,0.12)",
             border: "1px solid rgba(22,163,74,0.3)",
@@ -187,6 +113,19 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [showPopup, setShowPopup] = useState(false);
   const [popupType, setPopupType] = useState<"login" | "register">("login");
 
+  // Forgot password state
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [forgotMsg, setForgotMsg] = useState("");
+  const [forgotMsgType, setForgotMsgType] = useState<"success" | "error">(
+    "error",
+  );
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] =
+    useState(false);
+
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.style.border = inputFocusBorder;
   };
@@ -204,8 +143,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
     setLoading(false);
-
-    // Admin check
     if (trimEmail === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       localStorage.setItem("kuber_admin_fallback", "true");
       localStorage.setItem("kuber_admin_fallback_email", trimEmail);
@@ -215,21 +152,34 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setShowPopup(true);
       return;
     }
-
-    // Regular user check
     const stored = localStorage.getItem("kuber_users");
     const users: KuberUser[] = stored ? JSON.parse(stored) : [];
     const found = users.find(
       (u) => u.email.toLowerCase() === trimEmail && u.password === password,
     );
-    if (!found) {
-      setError("Invalid email or password");
+    if (found) {
+      localStorage.setItem("kuber_user_email", trimEmail);
+      localStorage.setItem("kuber_logged_in_user", trimEmail);
+      setPopupType("login");
+      setShowPopup(true);
       return;
     }
-    localStorage.setItem("kuber_user_email", trimEmail);
-    localStorage.setItem("kuber_logged_in_user", trimEmail);
-    setPopupType("login");
-    setShowPopup(true);
+    // Check if email exists with wrong password
+    const emailExists = users.find((u) => u.email.toLowerCase() === trimEmail);
+    if (!emailExists) {
+      // New device — auto-save credentials and log in
+      // (canister backend will provide their existing data)
+      users.push({ email: trimEmail, password });
+      localStorage.setItem("kuber_users", JSON.stringify(users));
+      LocalStore.saveRegisteredUser(trimEmail, password);
+      localStorage.setItem("kuber_user_email", trimEmail);
+      localStorage.setItem("kuber_logged_in_user", trimEmail);
+      setPopupType("login");
+      setShowPopup(true);
+      return;
+    }
+    // Email exists but password is wrong
+    setError("Invalid email or password");
   };
 
   const handleRegister = async () => {
@@ -254,7 +204,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
     setLoading(false);
-
     const stored = localStorage.getItem("kuber_users");
     const users: KuberUser[] = stored ? JSON.parse(stored) : [];
     const exists = users.find((u) => u.email.toLowerCase() === trimEmail);
@@ -264,12 +213,53 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
     users.push({ email: trimEmail, password });
     localStorage.setItem("kuber_users", JSON.stringify(users));
-    // Also save to kuber_registered_users for UserManagement compatibility
     LocalStore.saveRegisteredUser(trimEmail, password);
     localStorage.setItem("kuber_user_email", trimEmail);
     localStorage.setItem("kuber_logged_in_user", trimEmail);
     setPopupType("register");
     setShowPopup(true);
+  };
+
+  const handleForgotReset = () => {
+    setForgotMsg("");
+    const trimEmail = forgotEmail.trim().toLowerCase();
+    if (!trimEmail || !forgotNewPassword || !forgotConfirmPassword) {
+      setForgotMsg("All fields are required");
+      setForgotMsgType("error");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotMsg("Passwords do not match");
+      setForgotMsgType("error");
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setForgotMsg("Password must be at least 6 characters");
+      setForgotMsgType("error");
+      return;
+    }
+    const stored = localStorage.getItem("kuber_users");
+    const users: KuberUser[] = stored ? JSON.parse(stored) : [];
+    const idx = users.findIndex((u) => u.email.toLowerCase() === trimEmail);
+    if (idx === -1) {
+      setForgotMsg(
+        "No account found. If you're on a new device, please login with your email and password first.",
+      );
+      setForgotMsgType("error");
+      return;
+    }
+    users[idx].password = forgotNewPassword;
+    localStorage.setItem("kuber_users", JSON.stringify(users));
+    setForgotMsg("Password reset successful! You can now login.");
+    setForgotMsgType("success");
+    setForgotNewPassword("");
+    setForgotConfirmPassword("");
+    setTimeout(() => {
+      setShowForgot(false);
+      setForgotMsg("");
+      setTab("login");
+      setEmail(trimEmail);
+    }, 1800);
   };
 
   const handlePopupClose = () => {
@@ -299,18 +289,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <div className="relative w-full max-w-sm">
           <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
-              <KuberLogo size={88} />
+              <StableLogo size={88} glow />
             </div>
-            <h1
-              className="text-3xl font-black tracking-[0.2em] mb-0.5"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.88 0.16 85), oklch(0.72 0.12 85), oklch(0.88 0.16 85))",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
+            <h1 className="text-3xl font-black tracking-[0.2em] mb-0.5 shimmer-text">
               KUBER PANEL
             </h1>
             <p className="text-gray-500 text-xs tracking-[0.18em] uppercase">
@@ -319,17 +300,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <div
               className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full"
               style={{
-                background: "oklch(0.75 0.15 85 / 8%)",
-                border: "1px solid oklch(0.75 0.15 85 / 30%)",
+                background: "oklch(0.65 0.2 220 / 8%)",
+                border: "1px solid oklch(0.65 0.2 220 / 30%)",
               }}
             >
               <Shield
                 className="w-3 h-3"
-                style={{ color: "oklch(0.75 0.15 85)" }}
+                style={{ color: "oklch(0.65 0.2 220)" }}
               />
               <span
                 className="text-[10px] font-bold tracking-[0.12em] uppercase"
-                style={{ color: "oklch(0.75 0.15 85)" }}
+                style={{ color: "oklch(0.65 0.2 220)" }}
               >
                 OFFICIAL &amp; LICENSED PLATFORM
               </span>
@@ -342,18 +323,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               background: "oklch(0.08 0.008 220)",
               border: "1px solid oklch(0.65 0.15 220 / 30%)",
               boxShadow:
-                "0 24px 64px oklch(0 0 0 / 60%), 0 0 0 1px oklch(0.75 0.15 85 / 10%)",
+                "0 24px 64px oklch(0 0 0 / 60%), 0 0 0 1px oklch(0.65 0.2 220 / 10%)",
             }}
           >
             <div
               className="h-[2px] w-full"
               style={{
                 background:
-                  "linear-gradient(90deg, transparent, oklch(0.75 0.17 85), transparent)",
+                  "linear-gradient(90deg, transparent, oklch(0.65 0.2 220), transparent)",
               }}
             />
 
-            {/* Tabs */}
             <div
               className="flex"
               style={{ borderBottom: "1px solid oklch(0.65 0.15 220 / 20%)" }}
@@ -365,6 +345,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   onClick={() => {
                     setTab(t);
                     setError("");
+                    setShowForgot(false);
+                    setForgotMsg("");
                     setEmail("");
                     setPassword("");
                     setConfirmPassword("");
@@ -373,10 +355,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   className="flex-1 py-3 text-xs font-bold tracking-[0.15em] uppercase transition-all"
                   style={{
                     color:
-                      tab === t ? "oklch(0.82 0.17 85)" : "oklch(0.5 0.03 220)",
+                      tab === t
+                        ? "oklch(0.82 0.17 220)"
+                        : "oklch(0.5 0.03 220)",
                     borderBottom:
                       tab === t
-                        ? "2px solid oklch(0.75 0.17 85)"
+                        ? "2px solid oklch(0.65 0.2 220)"
                         : "2px solid transparent",
                     background: "transparent",
                   }}
@@ -388,7 +372,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
             <div className="p-6">
               <div className="space-y-3">
-                {/* Email */}
                 <div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                     <Mail className="w-3 h-3" /> Login ID (Email)
@@ -412,8 +395,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     onBlur={handleInputBlur}
                   />
                 </div>
-
-                {/* Password */}
                 <div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                     <Lock className="w-3 h-3" /> Password
@@ -451,8 +432,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     </button>
                   </div>
                 </div>
-
-                {/* Confirm Password (register only) */}
                 {tab === "register" && (
                   <div>
                     <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
@@ -491,7 +470,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     </div>
                   </div>
                 )}
-
                 {error && (
                   <div
                     className="text-xs px-3 py-2 rounded-lg"
@@ -505,17 +483,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     {error}
                   </div>
                 )}
-
                 <button
                   type="button"
                   onClick={tab === "login" ? handleLogin : handleRegister}
                   disabled={loading}
                   data-ocid="auth.submit_button"
-                  className="w-full py-3 rounded-xl font-bold text-black tracking-widest text-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                  className="w-full py-3 rounded-xl font-bold text-white tracking-widest text-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                   style={{
                     background:
-                      "linear-gradient(135deg, oklch(0.85 0.18 85), oklch(0.68 0.14 85))",
-                    boxShadow: "0 4px 20px oklch(0.75 0.17 85 / 25%)",
+                      "linear-gradient(135deg, oklch(0.55 0.2 240), oklch(0.45 0.2 270))",
+                    boxShadow: "0 4px 20px oklch(0.55 0.2 240 / 30%)",
                   }}
                 >
                   {loading
@@ -524,8 +501,174 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       ? "LOGIN TO KUBER PANEL"
                       : "CREATE ACCOUNT"}
                 </button>
-              </div>
 
+                {/* Forgot Password toggle — only on login tab */}
+                {tab === "login" && (
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgot((v) => !v);
+                        setForgotEmail(email);
+                        setForgotMsg("");
+                        setForgotNewPassword("");
+                        setForgotConfirmPassword("");
+                      }}
+                      data-ocid="auth.forgot_password.button"
+                      className="text-[11px] hover:text-cyan-400 transition-colors"
+                      style={{ color: "oklch(0.55 0.15 220)" }}
+                    >
+                      {showForgot ? "✕ Cancel Reset" : "Forgot Password?"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Forgot Password inline form */}
+                {tab === "login" && showForgot && (
+                  <div
+                    className="rounded-xl p-4 space-y-3 mt-1"
+                    style={{
+                      background: "oklch(0.06 0.008 220)",
+                      border: "1px solid oklch(0.65 0.15 220 / 15%)",
+                    }}
+                  >
+                    <div
+                      className="text-[10px] font-bold tracking-widest uppercase mb-2"
+                      style={{ color: "oklch(0.65 0.2 220)" }}
+                    >
+                      Reset Password
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Mail className="w-3 h-3" /> Email
+                      </div>
+                      <input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="Your registered email"
+                        data-ocid="auth.forgot_email.input"
+                        className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-gray-700 outline-none transition-all"
+                        style={{
+                          background: "oklch(0.12 0.005 220)",
+                          border: inputBlurBorder,
+                        }}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> New Password
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showForgotNewPassword ? "text" : "password"}
+                          value={forgotNewPassword}
+                          onChange={(e) => setForgotNewPassword(e.target.value)}
+                          placeholder="New password (min 6 chars)"
+                          data-ocid="auth.forgot_new_password.input"
+                          className="w-full px-3 py-2 pr-9 rounded-lg text-sm text-white placeholder-gray-700 outline-none transition-all"
+                          style={{
+                            background: "oklch(0.12 0.005 220)",
+                            border: inputBlurBorder,
+                          }}
+                          onFocus={handleInputFocus}
+                          onBlur={handleInputBlur}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowForgotNewPassword((p) => !p)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"
+                          tabIndex={-1}
+                        >
+                          {showForgotNewPassword ? (
+                            <EyeOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Confirm New Password
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showForgotConfirmPassword ? "text" : "password"}
+                          value={forgotConfirmPassword}
+                          onChange={(e) =>
+                            setForgotConfirmPassword(e.target.value)
+                          }
+                          placeholder="Confirm new password"
+                          data-ocid="auth.forgot_confirm_password.input"
+                          className="w-full px-3 py-2 pr-9 rounded-lg text-sm text-white placeholder-gray-700 outline-none transition-all"
+                          style={{
+                            background: "oklch(0.12 0.005 220)",
+                            border: inputBlurBorder,
+                          }}
+                          onFocus={handleInputFocus}
+                          onBlur={handleInputBlur}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowForgotConfirmPassword((p) => !p)
+                          }
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"
+                          tabIndex={-1}
+                        >
+                          {showForgotConfirmPassword ? (
+                            <EyeOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {forgotMsg && (
+                      <div
+                        className="text-xs px-3 py-2 rounded-lg"
+                        style={{
+                          background:
+                            forgotMsgType === "success"
+                              ? "rgba(22,163,74,0.12)"
+                              : "oklch(0.5 0.2 25 / 15%)",
+                          border:
+                            forgotMsgType === "success"
+                              ? "1px solid rgba(22,163,74,0.3)"
+                              : "1px solid oklch(0.5 0.2 25 / 30%)",
+                          color:
+                            forgotMsgType === "success"
+                              ? "#4ade80"
+                              : "oklch(0.72 0.18 25)",
+                        }}
+                      >
+                        {forgotMsg}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleForgotReset}
+                      data-ocid="auth.forgot_reset.submit_button"
+                      className="w-full py-2.5 rounded-xl font-bold text-white tracking-widest text-xs transition-all hover:opacity-90 active:scale-[0.98]"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.45 0.18 240), oklch(0.38 0.18 270))",
+                        boxShadow: "0 4px 14px oklch(0.45 0.18 240 / 25%)",
+                      }}
+                    >
+                      RESET PASSWORD
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="mt-4 flex items-center justify-center gap-1.5">
                 <Shield className="w-3 h-3 text-gray-700" />
                 <p className="text-center text-[10px] text-gray-700">

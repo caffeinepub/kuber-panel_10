@@ -7,7 +7,6 @@ function getBranchNameFromIFSC(ifsc: string): string {
   if (!ifsc || ifsc.length < 6) return ifsc || "";
   const bankPrefix = ifsc.slice(0, 4).toUpperCase();
   const branchCode = ifsc.slice(5).toUpperCase();
-
   const bankMap: Record<string, string> = {
     SBIN: "State Bank of India",
     HDFC: "HDFC Bank",
@@ -30,7 +29,6 @@ function getBranchNameFromIFSC(ifsc: string): string {
     FDRL: "Federal Bank",
     KARB: "Karnataka Bank",
   };
-
   const cityMap: Record<string, string> = {
     "0000": "Main Branch",
     "0001": "New Delhi",
@@ -61,9 +59,7 @@ function getBranchNameFromIFSC(ifsc: string): string {
     PAT: "Patna",
     CHD: "Chandigarh",
   };
-
   const bankName = bankMap[bankPrefix] ?? `${bankPrefix} Bank`;
-
   let city = "";
   for (const [code, cityName] of Object.entries(cityMap)) {
     if (branchCode.startsWith(code)) {
@@ -71,10 +67,7 @@ function getBranchNameFromIFSC(ifsc: string): string {
       break;
     }
   }
-  if (!city && branchCode.length > 0) {
-    city = `${branchCode.slice(0, 3)} Branch`;
-  }
-
+  if (!city && branchCode.length > 0) city = `${branchCode.slice(0, 3)} Branch`;
   return city ? `${bankName}, ${city}` : bankName;
 }
 
@@ -91,7 +84,6 @@ function buildReceiptRows(
   const rrn12 = numericPart.slice(0, 12);
   const rrn16 = numericPart.slice(0, 16).padEnd(16, "0");
   const upiRef = numericPart.slice(2, 14);
-
   const maskedAcc = d.accountNumber
     ? `${"X".repeat(Math.max(0, d.accountNumber.length - 4))}${d.accountNumber.slice(-4)}`
     : "XXXXXXXXXX";
@@ -99,9 +91,7 @@ function buildReceiptRows(
   const transferMode = d.transferMode || w.method.toUpperCase();
   const amount = `₹${w.amount.toLocaleString("en-IN")}`;
   const status = w.status.toUpperCase();
-
   const method = w.method?.toLowerCase();
-
   if (method === "upi") {
     return [
       ["UTR Number", utr12],
@@ -114,7 +104,6 @@ function buildReceiptRows(
       ["Status", status],
     ];
   }
-
   if (method === "usdt") {
     return [
       ["UTR Number", utr12],
@@ -128,16 +117,11 @@ function buildReceiptRows(
       ["Status", status],
     ];
   }
-
-  // Bank transfer — IMPS / NEFT / RTGS
   const isIMPS = transferMode === "IMPS";
-  const rrnLabel = isIMPS ? "RRN / IMPS Ref No" : "RRN Number";
-  const rrnValue = isIMPS ? rrn12 : rrn16;
-
   return [
     ["UTR Number", utr12],
     ["Transaction ID", txnId],
-    [rrnLabel, rrnValue],
+    [isIMPS ? "RRN / IMPS Ref No" : "RRN Number", isIMPS ? rrn12 : rrn16],
     ["Account Number", maskedAcc],
     ["IFSC Code", d.ifsc || "---"],
     ["Account Holder", d.accountHolderName || d.accountHolder || "---"],
@@ -170,7 +154,6 @@ function generateReceiptHTML(
         }">${v}</span></div>`,
     )
     .join("");
-
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Withdrawal Receipt — KUBER PANEL</title>
 <style>body{font-family:Arial,sans-serif;max-width:420px;margin:40px auto;padding:24px;background:#0a0f1e;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:12px;}
 h2{text-align:center;color:#60a5fa;letter-spacing:4px;margin-bottom:4px;} .sub{text-align:center;color:#64748b;font-size:12px;margin-bottom:12px;} .badge{text-align:center;background:rgba(22,163,74,0.15);color:#4ade80;padding:4px 16px;border-radius:20px;display:inline-block;font-weight:bold;margin:8px auto 16px;border:1px solid rgba(22,163,74,0.35);width:fit-content;display:block;} .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;} .label{color:#64748b;} .val{font-weight:600;font-family:monospace;text-align:right;max-width:58%;word-break:break-all;} .footer{text-align:center;color:#374151;font-size:10px;margin-top:16px;}
@@ -209,7 +192,6 @@ export default function WithdrawalHistory() {
       hour: "2-digit",
       minute: "2-digit",
     });
-
   const parseDetails = (d: string): Record<string, string> => {
     try {
       return JSON.parse(d) as Record<string, string>;
@@ -219,7 +201,6 @@ export default function WithdrawalHistory() {
   };
 
   const handlePrint = () => window.print();
-
   const handleOpen = (w: WithdrawalData) => {
     const d = parseDetails(w.methodDetails);
     const html = generateReceiptHTML(
@@ -234,7 +215,6 @@ export default function WithdrawalHistory() {
       win.document.close();
     }
   };
-
   const handleDownload = (w: WithdrawalData) => {
     const d = parseDetails(w.methodDetails);
     const html = generateReceiptHTML(
@@ -247,8 +227,7 @@ export default function WithdrawalHistory() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const utr = `UTR${w.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`;
-    a.download = `receipt-${utr}.html`;
+    a.download = `receipt-UTR${w.id.replace(/-/g, "").slice(0, 12).toUpperCase()}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -326,11 +305,7 @@ export default function WithdrawalHistory() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                        w.status === "approved"
-                          ? "text-green-400"
-                          : "text-yellow-400"
-                      }`}
+                      className={`px-2 py-0.5 rounded-full text-xs font-bold ${w.status === "approved" ? "text-green-400" : "text-yellow-400"}`}
                       style={{
                         background:
                           w.status === "approved"
@@ -359,7 +334,7 @@ export default function WithdrawalHistory() {
             className="w-full h-full flex flex-col"
             style={{ background: "oklch(0.07 0.008 220)" }}
           >
-            {/* Receipt header */}
+            {/* Receipt header — logo REMOVED per user request */}
             <div
               className="px-5 py-4 flex items-center justify-between flex-shrink-0"
               style={{
@@ -368,19 +343,12 @@ export default function WithdrawalHistory() {
                 borderBottom: "1px solid oklch(0.65 0.2 220 / 20%)",
               }}
             >
-              <div className="flex items-center gap-3">
-                <img
-                  src="/assets/uploads/IMG_20260316_083839_204-removebg-preview-1.png"
-                  alt="logo"
-                  className="w-9 h-9"
-                />
-                <div>
-                  <div className="font-black text-sm gold-text tracking-widest">
-                    KUBER PANEL
-                  </div>
-                  <div className="text-[10px] text-gray-500">
-                    Withdrawal Receipt
-                  </div>
+              <div>
+                <div className="font-black text-base tracking-widest shimmer-text">
+                  KUBER PANEL
+                </div>
+                <div className="text-[11px] text-gray-500">
+                  Withdrawal Receipt
                 </div>
               </div>
               <button
@@ -411,7 +379,7 @@ export default function WithdrawalHistory() {
               </span>
             </div>
 
-            {/* Receipt rows — scrollable, fills remaining height */}
+            {/* Receipt rows */}
             <div className="flex-1 overflow-y-auto px-5 py-2">
               {(() => {
                 const d = parseDetails(selected.methodDetails);
@@ -448,6 +416,14 @@ export default function WithdrawalHistory() {
                   </div>
                 ));
               })()}
+              {/* Computer generated note */}
+              <div
+                className="text-center py-4 text-[10px]"
+                style={{ color: "oklch(0.35 0 0)" }}
+              >
+                This is a computer-generated receipt. KUBER PANEL Official
+                Platform.
+              </div>
             </div>
 
             {/* Footer buttons */}
@@ -459,7 +435,11 @@ export default function WithdrawalHistory() {
                 type="button"
                 onClick={handlePrint}
                 data-ocid="withdrawal_history.print_button"
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold text-black gold-gradient"
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold text-white"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.55 0.2 240), oklch(0.45 0.2 270))",
+                }}
               >
                 <Printer className="w-4 h-4" /> Print
               </button>

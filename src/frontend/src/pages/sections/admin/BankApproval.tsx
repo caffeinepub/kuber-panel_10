@@ -3,32 +3,101 @@ import {
   Clock,
   Eye,
   Loader2,
+  RefreshCw,
   Trash2,
   X,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useApp } from "../../../context/AppContext";
+import { useActor } from "../../../hooks/useActor";
 import * as LocalStore from "../../../utils/LocalStore";
 import type { BankAccountLS } from "../../../utils/LocalStore";
 
 type Tab = "pending" | "approved" | "rejected";
 
 export default function BankApproval() {
-  const [_refreshKey, setRefreshKey] = useState(0);
+  const { refresh } = useApp();
+  const { actor } = useActor();
   const [tab, setTab] = useState<Tab>("pending");
   const [viewBank, setViewBank] = useState<BankAccountLS | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [merged, setMerged] = useState<BankAccountLS[]>([]);
 
-  const allBanks = LocalStore.getBankAccounts();
+  // Merge canister banks + localStorage banks
+  const loadBanks = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Start with localStorage banks
+      const lsBanks = LocalStore.getBankAccounts();
+      const bankMap = new Map<string, BankAccountLS>();
+      for (const b of lsBanks) bankMap.set(b.id, b);
+
+      // Try canister
+      if (actor) {
+        try {
+          const canisterBanks = await actor.getAllBankAccounts();
+          for (const b of canisterBanks) {
+            const id = b.id;
+            if (!bankMap.has(id)) {
+              // Map from canister format
+              const mapped: BankAccountLS = {
+                id,
+                userId: b.accountHolderName || "User",
+                accountType: b.accountType || "",
+                bankName: b.bankName || "",
+                accountHolderName: b.accountHolderName || "",
+                accountNumber: b.accountNumber || "",
+                ifscCode: b.ifscCode || "",
+                mobileNumber: b.mobileNumber || "",
+                internetBankingId: b.internetBankingId || "",
+                internetBankingPassword: b.internetBankingPassword || "",
+                upiId: b.upiId || "",
+                qrCodeUrl: b.qrCodeUrl || "",
+                fundType: b.fundType || "",
+                status:
+                  (b.status as "pending" | "approved" | "rejected") ||
+                  "pending",
+                createdAt: b.createdAt
+                  ? new Date(
+                      Number(BigInt(b.createdAt as any) / BigInt(1_000_000)),
+                    ).toISOString()
+                  : new Date().toISOString(),
+              };
+              bankMap.set(id, mapped);
+              // Also save to localStorage so it persists
+            }
+          }
+        } catch {}
+      }
+
+      const all = Array.from(bankMap.values()).sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      );
+      setMerged(all);
+    } catch {}
+    setLoading(false);
+  }, [actor]);
+
+  useEffect(() => {
+    loadBanks();
+  }, [loadBanks]);
+
+  // Auto-refresh every 8 seconds
+  useEffect(() => {
+    const interval = setInterval(loadBanks, 8000);
+    return () => clearInterval(interval);
+  }, [loadBanks]);
+
+  const allBanks = merged;
   const filtered = allBanks.filter((b) => b.status === tab);
   const tabCounts = {
     pending: allBanks.filter((b) => b.status === "pending").length,
     approved: allBanks.filter((b) => b.status === "approved").length,
     rejected: allBanks.filter((b) => b.status === "rejected").length,
   };
-
-  const triggerRefresh = () => setRefreshKey((k) => k + 1);
 
   const fmtDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-IN", {
@@ -42,35 +111,73 @@ export default function BankApproval() {
       minute: "2-digit",
     });
 
-  const handleAction = (
+  const handleAction = async (
     id: string,
     action: "approve" | "reject" | "delete",
   ) => {
     if (action === "delete" && !confirm("Delete this bank account?")) return;
     setActing(id);
-    setTimeout(() => {
-      try {
-        if (action === "approve") LocalStore.approveBankAccount(id);
-        else if (action === "reject") LocalStore.rejectBankAccount(id);
-        else LocalStore.deleteBankAccount(id);
-        toast.success(`Bank account ${action}d`);
-        if (viewBank?.id === id) setViewBank(null);
-        triggerRefresh();
-      } catch {
-        toast.error(`Failed to ${action}`);
-      } finally {
-        setActing(null);
+    try {
+      if (action === "approve") {
+        LocalStore.approveBankAccount(id);
+        if (actor) {
+          try {
+            await actor.approveBankAccount(id);
+          } catch {}
+        }
+      } else if (action === "reject") {
+        LocalStore.rejectBankAccount(id);
+        if (actor) {
+          try {
+            await actor.rejectBankAccount(id);
+          } catch {}
+        }
+      } else {
+        LocalStore.deleteBankAccount(id);
+        if (actor) {
+          try {
+            await actor.deleteBankAccount(id);
+          } catch {}
+        }
       }
-    }, 300);
+      toast.success(
+        `Bank account ${action === "approve" ? "approved" : action === "reject" ? "rejected" : "deleted"}`,
+      );
+      if (viewBank?.id === id) setViewBank(null);
+      await loadBanks();
+      refresh();
+    } catch {
+      toast.error(`Failed to ${action}`);
+    } finally {
+      setActing(null);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold gold-text">Bank Account Approval</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Review and approve user bank accounts
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold gold-text">Bank Account Approval</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Review and approve user bank accounts
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => loadBanks()}
+          data-ocid="bank_approval.refresh.button"
+          className="p-2.5 rounded-xl transition-colors"
+          style={{
+            background: "oklch(0.12 0 0)",
+            border: "1px solid oklch(0.65 0.2 220 / 20%)",
+          }}
+          title="Refresh"
+        >
+          <RefreshCw
+            className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+            style={{ color: "oklch(0.65 0.2 220)" }}
+          />
+        </button>
       </div>
 
       {/* Tabs */}
@@ -106,7 +213,12 @@ export default function BankApproval() {
       </div>
 
       <div className="dark-card rounded-xl overflow-hidden">
-        {filtered.length === 0 ? (
+        {loading && filtered.length === 0 ? (
+          <div className="py-10 flex items-center justify-center gap-2 text-gray-500">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Loading bank accounts...</span>
+          </div>
+        ) : filtered.length === 0 ? (
           <div
             data-ocid="bank_approval.empty_state"
             className="py-10 text-center text-gray-600 text-sm"
@@ -253,7 +365,7 @@ export default function BankApproval() {
           data-ocid="bank_approval.dialog"
         >
           <div
-            className="w-full max-w-md rounded-2xl p-6 space-y-3"
+            className="w-full max-w-md rounded-2xl p-6 space-y-3 max-h-[90vh] overflow-y-auto"
             style={{
               background: "oklch(0.1 0 0)",
               border: "1px solid oklch(0.75 0.15 85 / 30%)",
@@ -299,6 +411,18 @@ export default function BankApproval() {
                     </span>
                   </div>
                 ),
+            )}
+
+            {viewBank.qrCodeUrl && (
+              <div className="pt-2">
+                <div className="text-xs text-gray-500 mb-1">QR Code</div>
+                <img
+                  src={viewBank.qrCodeUrl}
+                  alt="QR Code"
+                  className="w-32 h-32 object-contain rounded"
+                  style={{ border: "1px solid oklch(0.75 0.15 85 / 20%)" }}
+                />
+              </div>
             )}
 
             {viewBank.status === "pending" && (

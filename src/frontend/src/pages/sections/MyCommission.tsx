@@ -38,12 +38,12 @@ export default function MyCommission() {
           border: "1px solid oklch(0.75 0.15 85 / 40%)",
         }}
       >
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
               Available Commission Balance
             </div>
-            <div className="text-4xl font-black gold-text">
+            <div className="text-4xl font-black gold-text break-all">
               ₹
               {displayBalance.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
@@ -51,7 +51,7 @@ export default function MyCommission() {
             </div>
           </div>
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{ background: "oklch(0.75 0.15 85 / 15%)" }}
           >
             <Coins className="w-8 h-8 gold-text" />
@@ -115,29 +115,31 @@ export default function MyCommission() {
                   border: `1px solid ${color}25`,
                 }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
+                <div className="flex items-start justify-between gap-2 min-w-0">
+                  {/* Left side text content */}
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span
-                        className="text-xs font-black uppercase px-2 py-0.5 rounded-full"
+                        className="text-xs font-black uppercase px-2 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: `${color}18`, color }}
                       >
                         {entry.fundLabel} Fund
                       </span>
                     </div>
-                    <div className="text-sm font-bold text-white mb-0.5">
+                    <div className="text-sm font-bold text-white mb-0.5 truncate">
                       {entry.bankName}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 truncate">
                       Acc: {entry.accountNumber}
                     </div>
-                    <div className="text-[10px] text-gray-600 mt-1">
+                    <div className="text-[10px] text-gray-600 mt-1 break-all">
                       {fmtDate(entry.startTime)} {fmtTime(entry.startTime)} →{" "}
                       {fmtDate(entry.endTime)} {fmtTime(entry.endTime)}
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-xl font-black gold-text">
+                  {/* Right side amount — fixed width, no overflow */}
+                  <div className="text-right flex-shrink-0 max-w-[110px]">
+                    <div className="text-lg font-black gold-text break-all">
                       +₹
                       {entry.totalCommission.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,

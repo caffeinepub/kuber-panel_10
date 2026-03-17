@@ -1,14 +1,22 @@
-import { Loader2, Trash2, UserCheck, UserMinus, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+  Loader2,
+  RefreshCw,
+  Trash2,
+  UserCheck,
+  UserMinus,
+  Users,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useActor } from "../../../hooks/useActor";
 import * as LocalStore from "../../../utils/LocalStore";
 
 interface UserRow {
-  principal: string;
   email: string;
   registeredAt: string;
   isActive: boolean;
   activatedFunds: string[];
+  source: string;
 }
 
 function FundBadges({ funds }: { funds: string[] }) {
@@ -39,51 +47,143 @@ function FundBadges({ funds }: { funds: string[] }) {
   );
 }
 
+const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
+
 export default function UserManagement() {
+  const { actor } = useActor();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
-  const [tab, setTab] = useState<"active" | "inactive">("active");
+  const [tab, setTab] = useState<"all" | "active" | "inactive">("all");
+  const actorRef = useRef(actor);
+  actorRef.current = actor;
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      // Load from both localStorage keys
-      const registeredUsers = LocalStore.getRegisteredUsers();
-      const oldUsers: { email: string; password: string }[] = JSON.parse(
-        localStorage.getItem("kuber_users") ?? "[]",
-      );
+      const emailMap = new Map<
+        string,
+        { registeredAt: string; source: string }
+      >();
 
-      // Merge deduped by email
-      const emailSet = new Set<string>();
-      const allUsers: { email: string; registeredAt: string }[] = [];
-      for (const u of registeredUsers) {
-        if (!emailSet.has(u.email)) {
-          emailSet.add(u.email);
-          allUsers.push({ email: u.email, registeredAt: u.registeredAt });
-        }
+      // Source 1: canister listAllUsers (cross-device)
+      if (actorRef.current) {
+        try {
+          const canisterUsers = await actorRef.current.listAllUsers();
+          for (const [, profile] of canisterUsers) {
+            const email = profile.name;
+            if (
+              email?.includes("@") &&
+              email !== ADMIN_EMAIL &&
+              !emailMap.has(email)
+            ) {
+              emailMap.set(email, {
+                registeredAt: new Date(
+                  Number(profile.createdAt / BigInt(1_000_000)),
+                ).toISOString(),
+                source: "canister",
+              });
+            }
+          }
+        } catch {}
       }
-      for (const u of oldUsers) {
-        if (!emailSet.has(u.email)) {
-          emailSet.add(u.email);
-          allUsers.push({
-            email: u.email,
-            registeredAt: new Date().toISOString(),
+
+      // Source 2: kuber_registered_users (primary registration store)
+      const registeredUsers = LocalStore.getRegisteredUsers();
+      for (const u of registeredUsers) {
+        if (u.email && u.email !== ADMIN_EMAIL && !emailMap.has(u.email)) {
+          emailMap.set(u.email, {
+            registeredAt: u.registeredAt,
+            source: "registered",
           });
         }
       }
 
-      const mapped: UserRow[] = allUsers.map((u) => {
-        const act = LocalStore.getUserActivation(u.email);
-        return {
-          principal: u.email,
-          email: u.email,
-          registeredAt: u.registeredAt,
-          isActive:
-            act?.isActive === true && (act.activatedFunds?.length ?? 0) > 0,
-          activatedFunds: act?.activatedFunds ?? [],
-        };
+      // Source 3: kuber_users (legacy / primary auth store)
+      try {
+        const oldUsers: { email: string; password: string }[] = JSON.parse(
+          localStorage.getItem("kuber_users") ?? "[]",
+        );
+        for (const u of oldUsers) {
+          if (u.email && u.email !== ADMIN_EMAIL && !emailMap.has(u.email)) {
+            emailMap.set(u.email, {
+              registeredAt: new Date().toISOString(),
+              source: "user",
+            });
+          }
+        }
+      } catch {}
+
+      // Source 4: kuber_user_activations (users who activated via code)
+      try {
+        const activations: Record<string, unknown> = JSON.parse(
+          localStorage.getItem("kuber_user_activations") ?? "{}",
+        );
+        for (const email of Object.keys(activations)) {
+          if (
+            email?.includes("@") &&
+            email !== ADMIN_EMAIL &&
+            !emailMap.has(email)
+          ) {
+            emailMap.set(email, {
+              registeredAt: new Date().toISOString(),
+              source: "activation",
+            });
+          }
+        }
+      } catch {}
+
+      // Source 5: current session users
+      const sessionEmails = [
+        localStorage.getItem("kuber_logged_in_user"),
+        localStorage.getItem("kuber_user_email"),
+      ];
+      for (const e of sessionEmails) {
+        if (e?.includes("@") && e !== ADMIN_EMAIL && !emailMap.has(e)) {
+          emailMap.set(e, {
+            registeredAt: new Date().toISOString(),
+            source: "session",
+          });
+        }
+      }
+
+      // Source 6: kuber_bank_accounts - get users who submitted banks
+      try {
+        const banks = LocalStore.getBankAccounts();
+        for (const b of banks) {
+          if (
+            b.userId?.includes("@") &&
+            b.userId !== ADMIN_EMAIL &&
+            !emailMap.has(b.userId)
+          ) {
+            emailMap.set(b.userId, {
+              registeredAt: b.createdAt,
+              source: "bank",
+            });
+          }
+        }
+      } catch {}
+
+      const mapped: UserRow[] = Array.from(emailMap.entries()).map(
+        ([email, info]) => {
+          const act = LocalStore.getUserActivation(email);
+          const isActive =
+            act?.isActive === true && (act.activatedFunds?.length ?? 0) > 0;
+          return {
+            email,
+            registeredAt: info.registeredAt,
+            isActive,
+            activatedFunds: act?.activatedFunds ?? [],
+            source: info.source,
+          };
+        },
+      );
+
+      mapped.sort((a, b) => {
+        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+        return b.registeredAt.localeCompare(a.registeredAt);
       });
+
       setRows(mapped);
     } catch (e) {
       console.error("Failed to load users:", e);
@@ -97,9 +197,16 @@ export default function UserManagement() {
     loadUsers();
   }, [loadUsers]);
 
+  // Auto-refresh every 10 seconds to catch new registrations
+  useEffect(() => {
+    const interval = setInterval(loadUsers, 10000);
+    return () => clearInterval(interval);
+  }, [loadUsers]);
+
   const activeRows = rows.filter((r) => r.isActive);
   const inactiveRows = rows.filter((r) => !r.isActive);
-  const displayRows = tab === "active" ? activeRows : inactiveRows;
+  const displayRows =
+    tab === "all" ? rows : tab === "active" ? activeRows : inactiveRows;
 
   const handleActivate = async (row: UserRow) => {
     setActing(row.email);
@@ -144,7 +251,6 @@ export default function UserManagement() {
     setActing(row.email);
     try {
       LocalStore.deleteRegisteredUser(row.email);
-      // Also delete from kuber_users
       const oldUsers: { email: string }[] = JSON.parse(
         localStorage.getItem("kuber_users") ?? "[]",
       );
@@ -170,16 +276,32 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold gold-text">User Management</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Manage registered users and activations
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold gold-text">User Management</h2>
+          <p className="text-sm text-gray-500 mt-1">All Kuber Panel users</p>
+        </div>
+        <button
+          type="button"
+          onClick={loadUsers}
+          data-ocid="user_management.refresh.button"
+          className="p-2.5 rounded-xl transition-colors"
+          style={{
+            background: "oklch(0.12 0 0)",
+            border: "1px solid oklch(0.65 0.2 220 / 20%)",
+          }}
+          title="Refresh users"
+        >
+          <RefreshCw
+            className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+            style={{ color: "oklch(0.65 0.2 220)" }}
+          />
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Total", value: rows.length, color: "oklch(0.75 0.15 85)" },
+          { label: "Total", value: rows.length, color: "oklch(0.65 0.2 220)" },
           {
             label: "Active",
             value: activeRows.length,
@@ -200,45 +322,42 @@ export default function UserManagement() {
         ))}
       </div>
 
-      <div className="flex gap-2">
-        {(["active", "inactive"] as const).map((t) => (
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {(["all", "active", "inactive"] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             data-ocid={`user_management.${t}.tab`}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all capitalize"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all capitalize whitespace-nowrap"
             style={
               tab === t
                 ? {
                     background:
-                      "linear-gradient(135deg,oklch(0.82 0.17 85),oklch(0.67 0.13 85))",
-                    color: "black",
+                      "linear-gradient(135deg,oklch(0.55 0.2 240),oklch(0.45 0.2 270))",
+                    color: "white",
                   }
                 : { background: "oklch(0.12 0 0)", color: "oklch(0.5 0 0)" }
             }
           >
             {t === "active" ? (
-              <UserCheck className="w-4 h-4" />
+              <UserCheck className="w-3.5 h-3.5" />
+            ) : t === "inactive" ? (
+              <UserMinus className="w-3.5 h-3.5" />
             ) : (
-              <UserMinus className="w-4 h-4" />
+              <Users className="w-3.5 h-3.5" />
             )}
-            {t === "active" ? "Active Users" : "Inactive Users"}
-            <span
-              className="px-1.5 py-0.5 rounded-full text-xs"
-              style={{
-                background: "rgba(0,0,0,0.2)",
-                color: tab === t ? "rgba(0,0,0,0.7)" : "oklch(0.5 0 0)",
-              }}
-            >
-              {t === "active" ? activeRows.length : inactiveRows.length}
-            </span>
+            {t === "all"
+              ? `All (${rows.length})`
+              : t === "active"
+                ? `Active (${activeRows.length})`
+                : `Inactive (${inactiveRows.length})`}
           </button>
         ))}
       </div>
 
       <div className="dark-card rounded-xl overflow-hidden">
-        {loading ? (
+        {loading && rows.length === 0 ? (
           <div className="py-10 flex items-center justify-center gap-2 text-gray-500">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span className="text-sm">Loading users...</span>
@@ -249,7 +368,12 @@ export default function UserManagement() {
             className="py-10 text-center text-gray-600 text-sm"
           >
             <Users className="w-12 h-12 mx-auto mb-3 text-gray-700" />
-            No {tab} users
+            No {tab === "all" ? "" : tab} users found.
+            {tab === "all" && (
+              <p className="text-xs text-gray-700 mt-2">
+                Users will appear here after registration.
+              </p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -257,7 +381,7 @@ export default function UserManagement() {
               <thead>
                 <tr
                   style={{
-                    borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)",
+                    borderBottom: "1px solid oklch(0.65 0.2 220 / 15%)",
                   }}
                 >
                   {[
@@ -265,7 +389,7 @@ export default function UserManagement() {
                     "Gmail ID",
                     "Reg. Date",
                     "Status",
-                    "Activated Funds",
+                    "Funds",
                     "Actions",
                   ].map((h) => (
                     <th
@@ -286,7 +410,7 @@ export default function UserManagement() {
                       data-ocid={`user_management.item.${i + 1}`}
                       className="table-row-hover"
                       style={{
-                        borderBottom: "1px solid oklch(0.75 0.15 85 / 8%)",
+                        borderBottom: "1px solid oklch(0.65 0.2 220 / 8%)",
                       }}
                     >
                       <td className="px-3 py-3 text-xs text-gray-600">
@@ -294,10 +418,13 @@ export default function UserManagement() {
                       </td>
                       <td className="px-3 py-3">
                         <span
-                          className="text-xs text-white font-medium break-all max-w-[140px] block truncate"
+                          className="text-xs text-white font-medium max-w-[130px] block truncate"
                           title={row.email}
                         >
                           {row.email}
+                        </span>
+                        <span className="text-[9px] text-gray-700 capitalize">
+                          {row.source}
                         </span>
                       </td>
                       <td className="px-3 py-3">
