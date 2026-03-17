@@ -281,6 +281,11 @@ export function AppProvider({
       const email = storedUserEmail;
       setUserEmail(email);
 
+      // Ensure user is registered in kuber_registered_users (for admin visibility)
+      if (email && email !== ADMIN_EMAIL) {
+        LocalStore.saveRegisteredUser(email, "");
+      }
+
       if (actor) {
         try {
           const [isAdminResult, profile] = await Promise.all([
@@ -304,6 +309,24 @@ export function AppProvider({
             } catch {}
             try {
               setWithdrawals(await actor.getWithdrawals());
+            } catch {}
+          } else if (email && email !== ADMIN_EMAIL) {
+            // Auto-register in canister so admin can see this user via listAllUsers
+            try {
+              const newProfile: UserProfile = {
+                name: email,
+                mobile: "",
+                status: UserStatus.active,
+                fundStatus: {
+                  gamingStatus: { isActive: false, codeUsed: "" },
+                  stockStatus: { isActive: false, codeUsed: "" },
+                  politicalStatus: { isActive: false, codeUsed: "" },
+                  mixStatus: { isActive: false, codeUsed: "" },
+                },
+                createdAt: BigInt(Date.now()) * BigInt(1_000_000),
+              };
+              await actor.saveCallerUserProfile(newProfile);
+              setCanisterProfile(newProfile);
             } catch {}
           }
           try {
@@ -514,6 +537,12 @@ export function AppProvider({
     if (session) {
       const sessionCommission = LocalStore.getAndClearSessionCommission(bankId);
       const bank = bankAccountsRef.current.find((b) => b.id === bankId);
+      const sessionStartTime =
+        LocalStore.getSessionStartTime(bankId) ?? new Date().toISOString();
+      const sessionEndTime = new Date().toISOString();
+      // Generate a session ID to group all statement entries from this session
+      const sessionGroupId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
       if (bank && sessionCommission > 0) {
         const fundLabel =
           session.fundType.charAt(0).toUpperCase() + session.fundType.slice(1);
@@ -523,9 +552,8 @@ export function AppProvider({
           bankName: bank.bankName,
           accountNumber: bank.accountNumber,
           totalCommission: sessionCommission,
-          startTime:
-            LocalStore.getSessionStartTime(bankId) ?? new Date().toISOString(),
-          endTime: new Date().toISOString(),
+          startTime: sessionStartTime,
+          endTime: sessionEndTime,
         });
       }
       const liveTxnsForBank = LocalStore.getLiveTransactionsByBank(bankId);
@@ -546,6 +574,9 @@ export function AppProvider({
           date: tx.date,
           time: tx.time,
           timestamp: tx.timestamp,
+          sessionId: sessionGroupId,
+          sessionStartTime,
+          sessionEndTime,
         }));
         LocalStore.addBankStatementEntries(stmtEntries);
       }

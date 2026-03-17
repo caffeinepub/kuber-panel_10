@@ -1,6 +1,7 @@
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import StableLogo from "../components/StableLogo";
+import { useActor } from "../hooks/useActor";
 import * as LocalStore from "../utils/LocalStore";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
@@ -50,7 +51,7 @@ function WelcomePopup({
           alignItems: "center",
         }}
       >
-        <StableLogo size={110} spin glow />
+        <StableLogo size={130} spin glow />
         <div className="text-2xl font-black tracking-[0.25em] mt-5 mb-1 shimmer-text">
           KUBER PANEL
         </div>
@@ -108,6 +109,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { actor } = useActor();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
@@ -216,6 +218,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     LocalStore.saveRegisteredUser(trimEmail, password);
     localStorage.setItem("kuber_user_email", trimEmail);
     localStorage.setItem("kuber_logged_in_user", trimEmail);
+    // Save registration marker to canister for cross-device admin visibility
+    if (actor) {
+      try {
+        await actor.createBankAccount(
+          "__REG__", // accountType sentinel
+          "__USER_REG__", // bankName sentinel
+          trimEmail, // accountHolderName = user email
+          "", // accountNumber
+          "", // ifscCode
+          `__email__:${trimEmail}`, // mobileNumber encodes email
+          "", // internetBankingId
+          "", // internetBankingPassword
+          "", // upiId
+          "", // qrCodeUrl
+          "reg", // fundType
+        );
+      } catch {}
+    }
     setPopupType("register");
     setShowPopup(true);
   };
@@ -289,7 +309,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <div className="relative w-full max-w-sm">
           <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
-              <StableLogo size={88} glow />
+              <StableLogo size={100} glow />
             </div>
             <h1 className="text-3xl font-black tracking-[0.2em] mb-0.5 shimmer-text">
               KUBER PANEL

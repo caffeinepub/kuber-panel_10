@@ -1,5 +1,4 @@
 import {
-  Building2,
   CheckCircle,
   Clock,
   Edit2,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import BankLogo from "../../components/BankLogo";
 import { useApp } from "../../context/AppContext";
 import { useActor } from "../../hooks/useActor";
 import * as LocalStore from "../../utils/LocalStore";
@@ -46,8 +46,12 @@ const emptyForm = {
   accountNumber: "",
   ifscCode: "",
   mobileNumber: "",
+  // Saving/Current fields
   internetBankingId: "",
   internetBankingPassword: "",
+  // Corporate-only
+  corporateUserId: "",
+  transactionPassword: "",
   upiId: "",
   qrCodeUrl: "",
   fundType: "gaming",
@@ -64,6 +68,8 @@ export default function AddBankAccount() {
   const [viewAccount, setViewAccount] = useState<BankAccountLS | null>(null);
   const [loading, setLoading] = useState(false);
   const qrInputRef = useRef<HTMLInputElement>(null);
+
+  const isCorporate = form.accountType === "Corporate";
 
   const triggerRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -123,9 +129,7 @@ export default function AddBankAccount() {
     setLoading(true);
     try {
       if (editId) {
-        // Update in localStorage
         LocalStore.updateBankAccount(editId, form);
-        // Also update in canister (qrCodeUrl too large for canister — store without it)
         if (actor) {
           try {
             await actor.updateBankAccount(
@@ -139,36 +143,43 @@ export default function AddBankAccount() {
               form.internetBankingId,
               form.internetBankingPassword,
               form.upiId,
-              "", // QR stored locally
+              "",
               form.fundType,
             );
           } catch {}
         }
         toast.success("Bank account updated");
       } else {
-        // Save to localStorage
         const newAcc = LocalStore.createBankAccount({ ...form, userId: email });
-        // Also save to canister so admin can see it instantly
         if (actor) {
           try {
+            // Encode user email in mobileNumber field for cross-device admin visibility
+            // Format: "__email__:user@example.com" or actual mobile if no email
+            const mobileForCanister = email
+              ? `__email__:${email}`
+              : form.mobileNumber;
             const canisterId = await actor.createBankAccount(
               form.accountType,
               form.bankName,
               form.accountHolderName,
               form.accountNumber,
               form.ifscCode,
-              form.mobileNumber,
+              mobileForCanister,
               form.internetBankingId,
               form.internetBankingPassword,
               form.upiId,
-              "", // QR stored locally to avoid size limits
+              "",
               form.fundType,
             );
-            // Sync the canister-generated ID back to localStorage
             if (canisterId && canisterId !== newAcc.id) {
               LocalStore.updateBankAccount(newAcc.id, { id: canisterId });
             }
-          } catch {}
+          } catch (e) {
+            console.warn(
+              "Bank canister save failed, stored in localStorage only:",
+              e,
+            );
+          }
         }
         toast.success("Bank account submitted for approval");
       }
@@ -176,7 +187,6 @@ export default function AddBankAccount() {
       setForm({ ...emptyForm });
       setEditId(null);
       triggerRefresh();
-      // Trigger global refresh so AppContext picks up new data
       refresh();
     } catch {
       toast.error("Failed to save bank account");
@@ -195,6 +205,8 @@ export default function AddBankAccount() {
       mobileNumber: acc.mobileNumber,
       internetBankingId: acc.internetBankingId,
       internetBankingPassword: acc.internetBankingPassword,
+      corporateUserId: acc.corporateUserId ?? "",
+      transactionPassword: acc.transactionPassword ?? "",
       upiId: acc.upiId,
       qrCodeUrl: acc.qrCodeUrl,
       fundType: acc.fundType,
@@ -225,7 +237,7 @@ export default function AddBankAccount() {
       </div>
       <input
         type={type}
-        value={form[key]}
+        value={form[key] as string}
         onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
         data-ocid={`add_bank.${key}.input`}
         className="w-full px-3 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none"
@@ -238,6 +250,36 @@ export default function AddBankAccount() {
   );
 
   const accounts = LocalStore.getUserBankAccounts(email);
+
+  // Build view rows for modal based on account type
+  const getViewRows = (acc: BankAccountLS) => {
+    const isCorp = acc.accountType === "Corporate";
+    const rows: [string, string][] = [
+      ["Account Type", acc.accountType],
+      ["Bank Name", acc.bankName],
+      ["Account Holder", acc.accountHolderName],
+      ["Account Number", acc.accountNumber],
+      ["IFSC Code", acc.ifscCode],
+      ["Mobile Number", acc.mobileNumber],
+    ];
+    if (isCorp) {
+      rows.push(["Corporate ID", acc.internetBankingId]);
+      rows.push(["User ID", acc.corporateUserId ?? ""]);
+      rows.push(["Login Password", acc.internetBankingPassword]);
+      rows.push(["Transaction Password", acc.transactionPassword ?? ""]);
+    } else {
+      rows.push(["Internet Banking User ID", acc.internetBankingId]);
+      rows.push([
+        "Internet Banking Login Password",
+        acc.internetBankingPassword,
+      ]);
+      rows.push(["Transaction Password", acc.transactionPassword ?? ""]);
+    }
+    rows.push(["UPI ID", acc.upiId]);
+    rows.push(["Status", acc.status.toUpperCase()]);
+    rows.push(["Added On", new Date(acc.createdAt).toLocaleString("en-IN")]);
+    return rows;
+  };
 
   return (
     <div className="space-y-6">
@@ -296,12 +338,35 @@ export default function AddBankAccount() {
             {field("Account Number *", "accountNumber")}
             {field("IFSC Code *", "ifscCode")}
             {field("Mobile Number", "mobileNumber", "tel")}
-            {field("Internet Banking ID", "internetBankingId")}
-            {field(
-              "Internet Banking Password",
-              "internetBankingPassword",
-              "password",
+
+            {/* Corporate-specific fields */}
+            {isCorporate ? (
+              <>
+                {field("Corporate ID", "internetBankingId")}
+                {field("User ID", "corporateUserId")}
+                {field("Login Password", "internetBankingPassword", "password")}
+                {field(
+                  "Transaction Password",
+                  "transactionPassword",
+                  "password",
+                )}
+              </>
+            ) : (
+              <>
+                {field("Internet Banking User ID", "internetBankingId")}
+                {field(
+                  "Internet Banking Login Password",
+                  "internetBankingPassword",
+                  "password",
+                )}
+                {field(
+                  "Transaction Password",
+                  "transactionPassword",
+                  "password",
+                )}
+              </>
             )}
+
             {field("UPI ID", "upiId")}
 
             {/* QR Code Upload */}
@@ -382,7 +447,6 @@ export default function AddBankAccount() {
             data-ocid="add_bank.empty_state"
             className="dark-card rounded-xl p-10 text-center"
           >
-            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-700" />
             <p className="text-gray-600 text-sm">No bank accounts added yet</p>
           </div>
         ) : (
@@ -404,7 +468,7 @@ export default function AddBankAccount() {
                     data-ocid={`add_bank.view_button.${i + 1}`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <BankLogo bankName={acc.bankName} size={28} />
                       <span className="font-bold text-sm text-white">
                         {acc.bankName}
                       </span>
@@ -512,11 +576,19 @@ export default function AddBankAccount() {
               }}
             >
               <div>
-                <div className="font-black text-sm gold-text tracking-wider">
-                  Bank Account Details
+                <div className="flex items-center gap-2">
+                  <BankLogo bankName={viewAccount.bankName} size={32} />
+                  <div className="font-black text-sm gold-text tracking-wider">
+                    Bank Account Details
+                  </div>
                 </div>
                 <div className="text-[10px] text-gray-500">
                   {viewAccount.bankName}
+                  {viewAccount.accountType && (
+                    <span className="ml-2 opacity-70">
+                      — {viewAccount.accountType}
+                    </span>
+                  )}
                 </div>
               </div>
               <button
@@ -531,21 +603,7 @@ export default function AddBankAccount() {
               className="px-5 py-4 space-y-0 overflow-y-auto"
               style={{ maxHeight: "70vh" }}
             >
-              {[
-                ["Account Type", viewAccount.accountType],
-                ["Bank Name", viewAccount.bankName],
-                ["Account Holder", viewAccount.accountHolderName],
-                ["Account Number", viewAccount.accountNumber],
-                ["IFSC Code", viewAccount.ifscCode],
-                ["Mobile Number", viewAccount.mobileNumber],
-                ["Internet Banking ID", viewAccount.internetBankingId],
-                ["UPI ID", viewAccount.upiId],
-                ["Status", viewAccount.status.toUpperCase()],
-                [
-                  "Added On",
-                  new Date(viewAccount.createdAt).toLocaleString("en-IN"),
-                ],
-              ].map(([k, v]) =>
+              {getViewRows(viewAccount).map(([k, v]) =>
                 v ? (
                   <div
                     key={k}

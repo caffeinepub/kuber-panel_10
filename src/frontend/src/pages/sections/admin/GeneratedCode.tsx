@@ -62,14 +62,15 @@ export default function GeneratedCode() {
 
   useEffect(() => {
     loadCodes();
+    // Auto-refresh every 5s to pick up newly used codes
+    const interval = setInterval(loadCodes, 5000);
+    return () => clearInterval(interval);
   }, [loadCodes]);
 
   const handleGenerate = async (fundType: string) => {
     setGenerating(fundType);
     try {
-      // Generate a self-validating code for cross-device use
       const svCode = generateSelfValidatingCode(fundType);
-      // Save to localStorage
       const allCodes = LocalStore.getActivationCodes();
       const entry: ActivationCodeLS = {
         code: svCode,
@@ -206,7 +207,14 @@ export default function GeneratedCode() {
                       borderBottom: "1px solid oklch(0.75 0.15 85 / 15%)",
                     }}
                   >
-                    {["Code", "Fund", "Created", "Status", "Copy"].map((h) => (
+                    {[
+                      "Code",
+                      "Fund",
+                      "Created",
+                      "Status",
+                      "Used By",
+                      "Copy",
+                    ].map((h) => (
                       <th
                         key={h}
                         className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider gold-text"
@@ -260,6 +268,24 @@ export default function GeneratedCode() {
                         >
                           {c.isActive ? "UNUSED" : "USED"}
                         </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        {c.usedByEmail ? (
+                          <div>
+                            <span
+                              className="text-[10px] font-medium block truncate max-w-[120px]"
+                              style={{ color: "oklch(0.65 0.2 220)" }}
+                              title={c.usedByEmail}
+                            >
+                              {c.usedByEmail}
+                            </span>
+                            <span className="text-[9px] text-gray-600">
+                              Activated
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-700 text-xs">-</span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         {c.isActive && (

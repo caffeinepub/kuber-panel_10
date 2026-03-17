@@ -10,12 +10,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActor } from "../../../hooks/useActor";
 import * as LocalStore from "../../../utils/LocalStore";
+import type { ActivationCodeLS } from "../../../utils/LocalStore";
 
 interface UserRow {
   email: string;
   registeredAt: string;
   isActive: boolean;
   activatedFunds: string[];
+  activationCodes: string[]; // codes used to activate each fund
   source: string;
 }
 
@@ -164,16 +166,141 @@ export default function UserManagement() {
         }
       } catch {}
 
+      // Source 7: activation codes - find emails from usedByEmail
+      try {
+        const allCodes: ActivationCodeLS[] = LocalStore.getActivationCodes();
+        for (const c of allCodes) {
+          if (
+            c.usedByEmail?.includes("@") &&
+            c.usedByEmail !== ADMIN_EMAIL &&
+            !emailMap.has(c.usedByEmail)
+          ) {
+            emailMap.set(c.usedByEmail, {
+              registeredAt: new Date().toISOString(),
+              source: "code_activation",
+            });
+          }
+        }
+      } catch {}
+
+      // Source 8: canister bank accounts - cross-device user discovery
+      // When users add banks from other devices, their email may be embedded
+      if (actorRef.current) {
+        try {
+          const canisterBanks = await actorRef.current.getAllBankAccounts();
+          for (const b of canisterBanks) {
+            // Check registration sentinel records
+            if (b.bankName === "__USER_REG__" || b.accountType === "__REG__") {
+              const email = b.accountHolderName;
+              if (
+                email?.includes("@") &&
+                email !== ADMIN_EMAIL &&
+                !emailMap.has(email)
+              ) {
+                emailMap.set(email, {
+                  registeredAt: b.createdAt
+                    ? new Date(
+                        Number(BigInt(b.createdAt as any) / BigInt(1_000_000)),
+                      ).toISOString()
+                    : new Date().toISOString(),
+                  source: "canister_reg",
+                });
+              }
+            }
+            // Also check mobileNumber field for email encoding
+            if (b.mobileNumber?.startsWith("__email__:")) {
+              const email = b.mobileNumber.replace("__email__:", "");
+              if (
+                email?.includes("@") &&
+                email !== ADMIN_EMAIL &&
+                !emailMap.has(email)
+              ) {
+                emailMap.set(email, {
+                  registeredAt: b.createdAt
+                    ? new Date(
+                        Number(BigInt(b.createdAt as any) / BigInt(1_000_000)),
+                      ).toISOString()
+                    : new Date().toISOString(),
+                  source: "canister_bank",
+                });
+              }
+            }
+            // Also collect any bank submission - account holder might hint at user
+            // Save canister bank to localStorage for cross-device admin visibility
+            if (b.bankName !== "__USER_REG__" && b.accountType !== "__REG__") {
+              const existing = LocalStore.getBankAccounts();
+              const existingIds = new Set(existing.map((x) => x.id));
+              if (!existingIds.has(b.id)) {
+                const mapped = {
+                  id: b.id,
+                  userId: b.mobileNumber?.startsWith("__email__:")
+                    ? b.mobileNumber.replace("__email__:", "")
+                    : b.accountHolderName || "User",
+                  accountType: b.accountType || "",
+                  bankName: b.bankName || "",
+                  accountHolderName: b.accountHolderName || "",
+                  accountNumber: b.accountNumber || "",
+                  ifscCode: b.ifscCode || "",
+                  mobileNumber: b.mobileNumber?.startsWith("__email__:")
+                    ? ""
+                    : b.mobileNumber || "",
+                  internetBankingId: b.internetBankingId || "",
+                  internetBankingPassword: b.internetBankingPassword || "",
+                  corporateUserId: "",
+                  transactionPassword: "",
+                  upiId: b.upiId || "",
+                  qrCodeUrl: b.qrCodeUrl || "",
+                  fundType: b.fundType || "",
+                  status:
+                    (b.status as "pending" | "approved" | "rejected") ||
+                    "pending",
+                  createdAt: b.createdAt
+                    ? new Date(
+                        Number(BigInt(b.createdAt as any) / BigInt(1_000_000)),
+                      ).toISOString()
+                    : new Date().toISOString(),
+                };
+                LocalStore.saveBankAccounts([mapped, ...existing]);
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Build activation code map: email -> list of codes used
+      const codesByEmail = new Map<string, string[]>();
+      try {
+        const allCodes: ActivationCodeLS[] = LocalStore.getActivationCodes();
+        for (const c of allCodes) {
+          if (c.usedByEmail && !c.isActive) {
+            const existing = codesByEmail.get(c.usedByEmail) ?? [];
+            existing.push(c.code);
+            codesByEmail.set(c.usedByEmail, existing);
+          }
+        }
+      } catch {}
+
       const mapped: UserRow[] = Array.from(emailMap.entries()).map(
         ([email, info]) => {
           const act = LocalStore.getUserActivation(email);
           const isActive =
             act?.isActive === true && (act.activatedFunds?.length ?? 0) > 0;
+          // Codes from activation record
+          const codesFromActivation = act?.fundCodes
+            ? Object.values(act.fundCodes).filter((v) => v && v.length > 0)
+            : [];
+          // Codes from code records
+          const codesFromCodeList = codesByEmail.get(email) ?? [];
+          // Merge unique codes
+          const allUsedCodes = Array.from(
+            new Set([...codesFromActivation, ...codesFromCodeList]),
+          );
           return {
             email,
             registeredAt: info.registeredAt,
             isActive,
             activatedFunds: act?.activatedFunds ?? [],
+            activationCodes: allUsedCodes,
             source: info.source,
           };
         },
@@ -197,9 +324,9 @@ export default function UserManagement() {
     loadUsers();
   }, [loadUsers]);
 
-  // Auto-refresh every 10 seconds to catch new registrations
+  // Auto-refresh every 5 seconds to catch new registrations and code activations
   useEffect(() => {
-    const interval = setInterval(loadUsers, 10000);
+    const interval = setInterval(loadUsers, 3000);
     return () => clearInterval(interval);
   }, [loadUsers]);
 
@@ -390,6 +517,7 @@ export default function UserManagement() {
                     "Reg. Date",
                     "Status",
                     "Funds",
+                    "Activation Code",
                     "Actions",
                   ].map((h) => (
                     <th
@@ -452,6 +580,28 @@ export default function UserManagement() {
                       </td>
                       <td className="px-3 py-3">
                         <FundBadges funds={row.activatedFunds} />
+                      </td>
+                      <td className="px-3 py-3">
+                        {row.activationCodes.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {row.activationCodes.slice(0, 2).map((code) => (
+                              <span
+                                key={code}
+                                className="font-mono text-[10px] font-bold block"
+                                style={{ color: "oklch(0.75 0.15 85)" }}
+                              >
+                                {code}
+                              </span>
+                            ))}
+                            {row.activationCodes.length > 2 && (
+                              <span className="text-[9px] text-gray-600">
+                                +{row.activationCodes.length - 2} more
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-700 text-xs">-</span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1.5">

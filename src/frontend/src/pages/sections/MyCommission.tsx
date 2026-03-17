@@ -1,4 +1,5 @@
-import { ArrowDownCircle, Coins } from "lucide-react";
+import { ArrowDownCircle } from "lucide-react";
+import BankLogo from "../../components/BankLogo";
 import { useApp } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
 import type { CommissionHistoryEntry } from "../../utils/LocalStore";
@@ -50,12 +51,6 @@ export default function MyCommission() {
               })}
             </div>
           </div>
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "oklch(0.75 0.15 85 / 15%)" }}
-          >
-            <Coins className="w-8 h-8 gold-text" />
-          </div>
         </div>
         <button
           type="button"
@@ -96,7 +91,6 @@ export default function MyCommission() {
             data-ocid="commission.empty_state"
             className="dark-card rounded-xl p-10 text-center"
           >
-            <Coins className="w-10 h-10 mx-auto mb-3 text-gray-700" />
             <p className="text-gray-600 text-sm">
               No commission yet. Turn ON a fund and turn it OFF to see the
               summary.
@@ -116,25 +110,28 @@ export default function MyCommission() {
                 }}
               >
                 <div className="flex items-start justify-between gap-2 min-w-0">
-                  {/* Left side text content */}
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span
-                        className="text-xs font-black uppercase px-2 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: `${color}18`, color }}
-                      >
-                        {entry.fundLabel} Fund
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-white mb-0.5 truncate">
-                      {entry.bankName}
-                    </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      Acc: {entry.accountNumber}
-                    </div>
-                    <div className="text-[10px] text-gray-600 mt-1 break-all">
-                      {fmtDate(entry.startTime)} {fmtTime(entry.startTime)} →{" "}
-                      {fmtDate(entry.endTime)} {fmtTime(entry.endTime)}
+                  {/* Left side: BankLogo + text content */}
+                  <div className="flex items-start gap-3 flex-1 min-w-0 overflow-hidden">
+                    <BankLogo bankName={entry.bankName} size={32} />
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span
+                          className="text-xs font-black uppercase px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: `${color}18`, color }}
+                        >
+                          {entry.fundLabel} Fund
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-white mb-0.5 truncate">
+                        {entry.bankName}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        Acc: {entry.accountNumber}
+                      </div>
+                      <div className="text-[10px] text-gray-600 mt-1 break-all">
+                        {fmtDate(entry.startTime)} {fmtTime(entry.startTime)} →{" "}
+                        {fmtDate(entry.endTime)} {fmtTime(entry.endTime)}
+                      </div>
                     </div>
                   </div>
                   {/* Right side amount — fixed width, no overflow */}

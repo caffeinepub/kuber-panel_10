@@ -205,7 +205,7 @@ export default function DashboardLayout() {
                     className="px-4 py-3 flex items-center gap-2.5"
                     style={{ borderBottom: "1px solid rgba(0,200,255,0.1)" }}
                   >
-                    <StableLogo size={36} />
+                    <StableLogo size={44} />
                     <div>
                       <div className="text-xs font-black tracking-[0.2em] shimmer-text">
                         KUBER PANEL
@@ -463,6 +463,20 @@ export default function DashboardLayout() {
                   >
                     Change Photo
                   </button>
+                  {profilePhoto && (
+                    <button
+                      type="button"
+                      className="text-[9px] mt-0.5"
+                      style={{ color: "rgba(255,80,80,0.7)" }}
+                      onClick={() => {
+                        localStorage.removeItem(photoKey);
+                        setProfilePhoto("");
+                      }}
+                      data-ocid="header.remove_photo_button"
+                    >
+                      Remove Photo
+                    </button>
+                  )}
                 </div>
               </div>
               <button

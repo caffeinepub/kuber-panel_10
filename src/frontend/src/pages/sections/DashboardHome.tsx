@@ -287,7 +287,7 @@ export default function DashboardHome() {
             }}
           />
           {/* Bigger logo — fully visible */}
-          <StableLogo size={80} />
+          <StableLogo size={96} />
           <div className="relative z-10 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-black tracking-widest shimmer-text">
