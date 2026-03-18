@@ -105,13 +105,15 @@ function buildReceiptRows(
     ];
   }
   if (method === "usdt") {
+    const usdtAmount = w.amount;
+    const inrEquiv = (usdtAmount * 85).toLocaleString("en-IN");
+    const txHash = cleanId.padEnd(64, "0").slice(0, 64).toLowerCase();
     return [
-      ["UTR Number", utr12],
-      ["Transaction ID", txnId],
-      ["TXN Hash", cleanId.slice(0, 32)],
-      ["Network", "TRC20"],
+      ["Wallet TXN Hash", `${txHash.slice(0, 32)}...`],
+      ["Network", "TRC20 (TRON)"],
       ["Wallet Address", d.usdtAddress || "---"],
-      ["Amount", amount],
+      ["USDT Amount", `₮${usdtAmount.toLocaleString("en-IN")}`],
+      ["INR Equivalent", `convert(₹${inrEquiv})`],
       ["Date", fmtDate],
       ["Time", fmtTime],
       ["Status", status],
@@ -294,7 +296,9 @@ export default function WithdrawalHistory() {
                     {fmtTime(w.createdAt)}
                   </td>
                   <td className="px-4 py-3 text-sm font-bold gold-text whitespace-nowrap">
-                    ₹{w.amount.toLocaleString("en-IN")}
+                    {w.method?.toLowerCase() === "usdt"
+                      ? `₮${w.amount.toLocaleString("en-IN")}`
+                      : `₹${w.amount.toLocaleString("en-IN")}`}
                   </td>
                   <td className="px-4 py-3 text-xs text-white uppercase whitespace-nowrap">
                     {w.method}

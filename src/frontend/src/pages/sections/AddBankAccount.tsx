@@ -57,8 +57,116 @@ const emptyForm = {
   fundType: "gaming",
 };
 
+const IFSC_BANK_MAP: Record<string, string> = {
+  SBIN: "State Bank of India",
+  HDFC: "HDFC Bank",
+  ICIC: "ICICI Bank",
+  PUNB: "Punjab National Bank",
+  UTIB: "Axis Bank",
+  KKBK: "Kotak Mahindra Bank",
+  BARB: "Bank of Baroda",
+  CNRB: "Canara Bank",
+  UBIN: "Union Bank of India",
+  IOBA: "Indian Overseas Bank",
+  BKID: "Bank of India",
+  IDBI: "IDBI Bank",
+  YESB: "Yes Bank",
+  INDB: "IndusInd Bank",
+  MAHB: "Bank of Maharashtra",
+  FDRL: "Federal Bank",
+  KARB: "Karnataka Bank",
+  KVBL: "Karur Vysya Bank",
+  SRCB: "Saraswat Bank",
+  AUBL: "AU Small Finance Bank",
+  ESFB: "Equitas SFB",
+  USFB: "Ujjivan SFB",
+  RATN: "RBL Bank",
+  DCBL: "DCB Bank",
+  SIBL: "South Indian Bank",
+  CITI: "Citibank",
+  HSBC: "HSBC Bank",
+  PYTM: "Paytm Payments Bank",
+  AIRP: "Airtel Payments Bank",
+  FINO: "Fino Payments Bank",
+  NSPB: "NSDL Payments Bank",
+  ALLA: "Allahabad Bank",
+  CORP: "Corporation Bank",
+  VIJB: "Vijaya Bank",
+  DENA: "Dena Bank",
+  ORBC: "Oriental Bank",
+  ANDH: "Andhra Bank",
+  UCBA: "UCO Bank",
+  CBIN: "Central Bank of India",
+};
+
+const CITY_MAP: Record<string, string> = {
+  MUM: "Mumbai",
+  BOM: "Mumbai",
+  DEL: "Delhi",
+  BNG: "Bangalore",
+  BLR: "Bangalore",
+  CHN: "Chennai",
+  MAA: "Chennai",
+  HYD: "Hyderabad",
+  KOL: "Kolkata",
+  AHM: "Ahmedabad",
+  AMD: "Ahmedabad",
+  PUN: "Pune",
+  PNE: "Pune",
+  JAI: "Jaipur",
+  LKN: "Lucknow",
+  SRT: "Surat",
+  NAG: "Nagpur",
+  IND: "Indore",
+  BHO: "Bhopal",
+  PAT: "Patna",
+  CHD: "Chandigarh",
+  VAD: "Vadodara",
+  RAJ: "Rajkot",
+  KAN: "Kanpur",
+  AGR: "Agra",
+  NAS: "Nashik",
+  AUR: "Aurangabad",
+  GOA: "Goa",
+  KOC: "Kochi",
+  COK: "Kochi",
+  TRV: "Trivandrum",
+  CLC: "Calicut",
+  VIJ: "Vijayawada",
+  VIS: "Visakhapatnam",
+  COI: "Coimbatore",
+  MAD: "Madurai",
+  TRI: "Tiruchirappalli",
+};
+
+function getIFSCInfo(
+  ifsc: string,
+): { bankName: string; branch: string; city: string } | null {
+  if (!ifsc || ifsc.length < 4) return null;
+  const prefix = ifsc.slice(0, 4).toUpperCase();
+  const bankName = IFSC_BANK_MAP[prefix];
+  if (!bankName) return null;
+  const code = ifsc.slice(5).toUpperCase();
+  let city = "";
+  for (const [abbr, cityName] of Object.entries(CITY_MAP)) {
+    if (code.includes(abbr)) {
+      city = cityName;
+      break;
+    }
+  }
+  const branch = city ? `Branch Code: ${code}` : `${code} Branch`;
+  return { bankName, branch, city };
+}
+
 export default function AddBankAccount() {
-  const { isActivated, isAdmin, setActiveSection, refresh } = useApp();
+  const {
+    isActivated,
+    isAdmin,
+    setActiveSection,
+    refresh,
+    clearFundSession,
+    activeFundSessions,
+  } = useApp();
   const { actor } = useActor();
   const email = localStorage.getItem("kuber_user_email") ?? "";
   const [_refreshKey, setRefreshKey] = useState(0);
@@ -218,6 +326,10 @@ export default function AddBankAccount() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this bank account?")) return;
+    // If there is an active fund session for this bank, clear it first
+    if (activeFundSessions[id]) {
+      clearFundSession(id);
+    }
     LocalStore.deleteBankAccount(id);
     if (actor) {
       try {
@@ -336,7 +448,30 @@ export default function AddBankAccount() {
             {field("Bank Name *", "bankName")}
             {field("Account Holder Name *", "accountHolderName")}
             {field("Account Number *", "accountNumber")}
-            {field("IFSC Code *", "ifscCode")}
+            <div>
+              {field("IFSC Code *", "ifscCode")}
+              {form.ifscCode.length >= 11 &&
+                (() => {
+                  const info = getIFSCInfo(form.ifscCode);
+                  if (!info) return null;
+                  return (
+                    <div
+                      className="mt-1 px-3 py-2 rounded-lg text-xs"
+                      style={{
+                        background: "rgba(34,211,238,0.08)",
+                        border: "1px solid rgba(34,211,238,0.2)",
+                        color: "#22d3ee",
+                      }}
+                    >
+                      <span className="font-bold">{info.bankName}</span>
+                      {info.city && (
+                        <span className="text-gray-400"> · {info.city}</span>
+                      )}
+                      <span className="text-gray-500"> · {info.branch}</span>
+                    </div>
+                  );
+                })()}
+            </div>
             {field("Mobile Number", "mobileNumber", "tel")}
 
             {/* Corporate-specific fields */}

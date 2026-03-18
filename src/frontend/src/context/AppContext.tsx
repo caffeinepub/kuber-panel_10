@@ -36,7 +36,33 @@ export const COMMISSION_RATES: Record<string, number> = {
 const generate12DigitUTR = () =>
   Math.floor(100000000000 + Math.random() * 900000000000).toString();
 
-const randAmount = () => Math.floor(Math.random() * 49000 + 1000);
+const getCreditAmount = (fundType: string): number => {
+  switch (fundType) {
+    case "gaming":
+      return Math.floor(200 + Math.random() * 9800);
+    case "mix":
+      return Math.floor(10000 + Math.random() * 40000);
+    case "political":
+    case "stock":
+      return Math.floor(50000 + Math.random() * 1450000);
+    default:
+      return Math.floor(200 + Math.random() * 9800);
+  }
+};
+
+const getDebitAmount = (fundType: string): number => {
+  switch (fundType) {
+    case "gaming":
+      return Math.floor(5000 + Math.random() * 95000);
+    case "mix":
+      return Math.floor(10000 + Math.random() * 190000);
+    case "political":
+    case "stock":
+      return Math.floor(300000 + Math.random() * 700000);
+    default:
+      return Math.floor(5000 + Math.random() * 95000);
+  }
+};
 
 type Section =
   | "dashboard"
@@ -192,6 +218,7 @@ export function AppProvider({
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const txTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeFundSessionsRef = useRef(activeFundSessions);
   activeFundSessionsRef.current = activeFundSessions;
   const bankAccountsRef = useRef(bankAccountsLS);
@@ -374,45 +401,84 @@ export function AppProvider({
     [actor],
   );
 
+  const isAdminRef = useRef(isAdmin);
+  isAdminRef.current = isAdmin;
+  const actorRef = useRef(actor);
+  actorRef.current = actor;
+
   const runTick = useCallback(async () => {
     const sessions = Object.entries(activeFundSessionsRef.current);
-    if (!sessions.length || !isAdmin) return;
+    if (!sessions.length || !isAdminRef.current) return;
     const [bankId, { fundType }] =
       sessions[Math.floor(Math.random() * sessions.length)];
     const utr = generate12DigitUTR();
-    const isCredit = Math.random() > 0.3;
-    const amount = randAmount();
+    const creditAmount = getCreditAmount(fundType);
     const commRate = COMMISSION_RATES[fundType] ?? 0.15;
-    const commission = +(amount * commRate).toFixed(2);
+    const commission = +(creditAmount * commRate).toFixed(2);
     const now = new Date();
-    const newTx: LiveTx = {
+    const creditTx: LiveTx = {
       id: Math.random().toString(36).slice(2),
       date: now.toLocaleDateString("en-IN"),
       time: now.toLocaleTimeString("en-IN"),
       utrNumber: utr,
-      credit: isCredit ? amount : 0,
-      debit: isCredit ? 0 : amount,
+      credit: creditAmount,
+      debit: 0,
       bankId,
       fundType,
       timestamp: now.toISOString(),
     };
-    setLiveTxns((prev) => [newTx, ...prev]);
+    setLiveTxns((prev) => [creditTx, ...prev]);
     LocalStore.addAdminCommission(commission);
     LocalStore.addToSessionCommission(bankId, commission);
-    LocalStore.saveLiveTransaction(bankId, newTx as LiveTxEntry);
+    LocalStore.saveLiveTransaction(bankId, creditTx as LiveTxEntry);
     setAdminCommissionBalance(LocalStore.getAdminCommission());
-    if (actor) {
+    if (actorRef.current) {
       try {
-        await actor.createTransaction(
+        await actorRef.current.createTransaction(
           bankId,
           utr,
-          newTx.credit,
-          newTx.debit,
+          creditAmount,
+          0,
           fundType,
         );
       } catch {}
     }
-  }, [isAdmin, actor]);
+
+    // Schedule debit 3–5 seconds after credit
+    const debitDelay = 6000 + Math.random() * 9000;
+    if (debitTimerRef.current) clearTimeout(debitTimerRef.current);
+    debitTimerRef.current = setTimeout(async () => {
+      const sessions2 = Object.entries(activeFundSessionsRef.current);
+      if (!sessions2.length || !isAdminRef.current) return;
+      const debitAmount = getDebitAmount(fundType);
+      const debitUtr = generate12DigitUTR();
+      const now2 = new Date();
+      const debitTx: LiveTx = {
+        id: Math.random().toString(36).slice(2),
+        date: now2.toLocaleDateString("en-IN"),
+        time: now2.toLocaleTimeString("en-IN"),
+        utrNumber: debitUtr,
+        credit: 0,
+        debit: debitAmount,
+        bankId,
+        fundType,
+        timestamp: now2.toISOString(),
+      };
+      setLiveTxns((prev) => [debitTx, ...prev]);
+      LocalStore.saveLiveTransaction(bankId, debitTx as LiveTxEntry);
+      if (actorRef.current) {
+        try {
+          await actorRef.current.createTransaction(
+            bankId,
+            debitUtr,
+            0,
+            debitAmount,
+            fundType,
+          );
+        } catch {}
+      }
+    }, debitDelay);
+  }, []);
 
   useEffect(() => {
     const hasSessions = activeSessionKey.length > 0;
@@ -425,7 +491,7 @@ export function AppProvider({
     }
     runTick();
     const scheduleNext = () => {
-      const delay = 12000 + Math.random() * 13000;
+      const delay = 5000 + Math.random() * 5000;
       txTimerRef.current = setTimeout(() => {
         runTick();
         scheduleNext();
@@ -436,6 +502,10 @@ export function AppProvider({
       if (txTimerRef.current) {
         clearTimeout(txTimerRef.current);
         txTimerRef.current = null;
+      }
+      if (debitTimerRef.current) {
+        clearTimeout(debitTimerRef.current);
+        debitTimerRef.current = null;
       }
     };
   }, [isAdmin, activeSessionKey, runTick]);

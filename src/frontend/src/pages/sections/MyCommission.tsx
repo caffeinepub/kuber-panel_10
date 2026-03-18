@@ -1,6 +1,8 @@
-import { ArrowDownCircle } from "lucide-react";
+import { ArrowDownCircle, X } from "lucide-react";
+import { useState } from "react";
 import BankLogo from "../../components/BankLogo";
 import { useApp } from "../../context/AppContext";
+import { COMMISSION_RATES } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
 import type { CommissionHistoryEntry } from "../../utils/LocalStore";
 
@@ -13,6 +15,8 @@ const fundColors: Record<string, string> = {
 
 export default function MyCommission() {
   const { setActiveSection, isAdmin } = useApp();
+  const [selectedEntry, setSelectedEntry] =
+    useState<CommissionHistoryEntry | null>(null);
 
   const adminBalance = LocalStore.getAdminCommission();
   const commissionHistory: CommissionHistoryEntry[] =
@@ -100,14 +104,16 @@ export default function MyCommission() {
           commissionHistory.map((entry, i) => {
             const color = fundColors[entry.fundType] ?? "#d4a017";
             return (
-              <div
+              <button
+                type="button"
                 key={entry.id}
                 data-ocid={`commission.item.${i + 1}`}
-                className="rounded-xl p-4"
+                className="w-full text-left rounded-xl p-4 cursor-pointer transition-all"
                 style={{
                   background: "#000000",
                   border: `1px solid ${color}25`,
                 }}
+                onClick={() => setSelectedEntry(entry)}
               >
                 <div className="flex items-start justify-between gap-2 min-w-0">
                   {/* Left side: BankLogo + text content */}
@@ -147,11 +153,149 @@ export default function MyCommission() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })
         )}
       </div>
+
+      {/* Commission Details Modal */}
+      {selectedEntry && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col"
+          style={{ background: "#000000" }}
+          data-ocid="commission.details.modal"
+        >
+          {/* Header */}
+          <div
+            className="px-5 py-4 flex items-center justify-between flex-shrink-0"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.12 0.02 85), oklch(0.09 0.01 85))",
+              borderBottom: "1px solid oklch(0.75 0.15 85 / 20%)",
+            }}
+          >
+            <div className="font-black text-base tracking-widest gold-text">
+              Commission Details
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedEntry(null)}
+              data-ocid="commission.details.close_button"
+              className="p-2 rounded-full"
+              style={{ background: "rgba(255,255,255,0.06)" }}
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+            {/* Fund badge */}
+            <div className="flex items-center gap-3">
+              <span
+                className="text-sm font-black uppercase px-3 py-1 rounded-full"
+                style={{
+                  background: `${fundColors[selectedEntry.fundType] ?? "#d4a017"}20`,
+                  color: fundColors[selectedEntry.fundType] ?? "#d4a017",
+                  border: `1px solid ${fundColors[selectedEntry.fundType] ?? "#d4a017"}40`,
+                }}
+              >
+                {selectedEntry.fundLabel} Fund
+              </span>
+            </div>
+
+            {/* Bank info */}
+            <div
+              className="rounded-xl p-4"
+              style={{ background: "#0d0d0d", border: "1px solid #1a1a1a" }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <BankLogo bankName={selectedEntry.bankName} size={40} />
+                <div>
+                  <div className="font-black text-white text-sm">
+                    {selectedEntry.bankName}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    A/C: {selectedEntry.accountNumber}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Total commission */}
+            <div
+              className="rounded-xl p-5 text-center"
+              style={{
+                background: "rgba(212,160,23,0.06)",
+                border: "1px solid rgba(212,160,23,0.2)",
+              }}
+            >
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                Total Commission Earned
+              </div>
+              <div className="text-4xl font-black gold-text">
+                +₹
+                {selectedEntry.totalCommission.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                Commission Rate:{" "}
+                {(
+                  (COMMISSION_RATES[selectedEntry.fundType] ?? 0.15) * 100
+                ).toFixed(0)}
+                %
+              </div>
+            </div>
+
+            {/* Time details */}
+            <div className="space-y-2">
+              {[
+                [
+                  "Fund ON",
+                  `${fmtDate(selectedEntry.startTime)} ${fmtTime(selectedEntry.startTime)}`,
+                ],
+                [
+                  "Fund OFF",
+                  `${fmtDate(selectedEntry.endTime)} ${fmtTime(selectedEntry.endTime)}`,
+                ],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex justify-between py-3"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <span className="text-xs text-gray-500">{label}</span>
+                  <span className="text-xs font-semibold text-white">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            className="px-5 py-4 flex-shrink-0"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedEntry(null)}
+              data-ocid="commission.details.cancel_button"
+              className="w-full py-3 rounded-xl text-sm font-bold"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                color: "#9ca3af",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

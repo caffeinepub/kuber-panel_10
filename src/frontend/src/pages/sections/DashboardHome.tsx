@@ -56,108 +56,109 @@ export default function DashboardHome() {
       label: "Add Bank Account",
       desc: "Link your bank securely",
       Icon: Landmark,
-      gradient: "linear-gradient(145deg, #060e20, #000)",
+      gradient: "linear-gradient(145deg, rgba(6,14,32,0.88), rgba(0,0,0,0.78))",
       accent: "#3b82f6",
-      iconBg: "rgba(59,130,246,0.14)",
+      iconBg: "rgba(59,130,246,0.16)",
     },
     {
       id: "bank-statement",
       label: "Bank Statement",
       desc: "Transaction history",
       Icon: ScrollText,
-      gradient: "linear-gradient(145deg, #051508, #000)",
+      gradient: "linear-gradient(145deg, rgba(5,21,8,0.88), rgba(0,0,0,0.78))",
       accent: "#10b981",
-      iconBg: "rgba(16,185,129,0.14)",
+      iconBg: "rgba(16,185,129,0.16)",
     },
     {
       id: "gaming-fund",
       label: "Gaming Fund",
       desc: "15% commission",
       Icon: Gamepad2,
-      gradient: "linear-gradient(145deg, #180a30, #000)",
+      gradient:
+        "linear-gradient(145deg, rgba(24,10,48,0.88), rgba(0,0,0,0.78))",
       accent: "#9333ea",
-      iconBg: "rgba(147,51,234,0.14)",
+      iconBg: "rgba(147,51,234,0.16)",
     },
     {
       id: "stock-fund",
       label: "Stock Fund",
       desc: "30% commission",
       Icon: BarChart2,
-      gradient: "linear-gradient(145deg, #051a12, #000)",
+      gradient: "linear-gradient(145deg, rgba(5,26,18,0.88), rgba(0,0,0,0.78))",
       accent: "#14b8a6",
-      iconBg: "rgba(20,184,166,0.14)",
+      iconBg: "rgba(20,184,166,0.16)",
     },
     {
       id: "political-fund",
       label: "Political Fund",
       desc: "30% commission",
       Icon: Flag,
-      gradient: "linear-gradient(145deg, #220606, #000)",
+      gradient: "linear-gradient(145deg, rgba(34,6,6,0.88), rgba(0,0,0,0.78))",
       accent: "#ef4444",
-      iconBg: "rgba(239,68,68,0.14)",
+      iconBg: "rgba(239,68,68,0.16)",
     },
     {
       id: "mix-fund",
       label: "Mix Fund",
       desc: "25% commission",
       Icon: Layers,
-      gradient: "linear-gradient(145deg, #041218, #000)",
+      gradient: "linear-gradient(145deg, rgba(4,18,24,0.88), rgba(0,0,0,0.78))",
       accent: "#06b6d4",
-      iconBg: "rgba(6,182,212,0.14)",
+      iconBg: "rgba(6,182,212,0.16)",
     },
     {
       id: "commission",
       label: "My Commission",
       desc: "Track earnings",
       Icon: CircleDollarSign,
-      gradient: "linear-gradient(145deg, #1c1200, #000)",
+      gradient: "linear-gradient(145deg, rgba(28,18,0,0.88), rgba(0,0,0,0.78))",
       accent: "#f59e0b",
-      iconBg: "rgba(245,158,11,0.14)",
+      iconBg: "rgba(245,158,11,0.16)",
     },
     {
       id: "live-activity",
       label: "Live Fund Activity",
       desc: "Real-time updates",
       Icon: Zap,
-      gradient: "linear-gradient(145deg, #041420, #000)",
+      gradient: "linear-gradient(145deg, rgba(4,20,32,0.88), rgba(0,0,0,0.78))",
       accent: "#22d3ee",
-      iconBg: "rgba(34,211,238,0.14)",
+      iconBg: "rgba(34,211,238,0.16)",
     },
     {
       id: "withdrawal",
       label: "Withdrawal",
       desc: "IMPS / NEFT / RTGS",
       Icon: Banknote,
-      gradient: "linear-gradient(145deg, #130828, #000)",
+      gradient: "linear-gradient(145deg, rgba(19,8,40,0.88), rgba(0,0,0,0.78))",
       accent: "#a78bfa",
-      iconBg: "rgba(167,139,250,0.14)",
+      iconBg: "rgba(167,139,250,0.16)",
     },
     {
       id: "withdrawal-history",
       label: "Withdrawal History",
       desc: "Past transactions",
       Icon: Timer,
-      gradient: "linear-gradient(145deg, #180612, #000)",
+      gradient: "linear-gradient(145deg, rgba(24,6,18,0.88), rgba(0,0,0,0.78))",
       accent: "#f472b6",
-      iconBg: "rgba(244,114,182,0.14)",
+      iconBg: "rgba(244,114,182,0.16)",
     },
     {
       id: "activation",
       label: "Activation Panel",
       desc: "Unlock fund options",
       Icon: ShieldCheck,
-      gradient: "linear-gradient(145deg, #1c1500, #000)",
+      gradient: "linear-gradient(145deg, rgba(28,21,0,0.88), rgba(0,0,0,0.78))",
       accent: "#fbbf24",
-      iconBg: "rgba(251,191,36,0.14)",
+      iconBg: "rgba(251,191,36,0.16)",
     },
     {
       id: "help-support",
       label: "Help Support",
       desc: "Telegram support",
       Icon: Headphones,
-      gradient: "linear-gradient(145deg, #040e18, #000)",
+      gradient: "linear-gradient(145deg, rgba(4,14,24,0.88), rgba(0,0,0,0.78))",
       accent: "#38bdf8",
-      iconBg: "rgba(56,189,248,0.14)",
+      iconBg: "rgba(56,189,248,0.16)",
     },
   ];
 
@@ -167,36 +168,36 @@ export default function DashboardHome() {
       label: "Generated Codes",
       desc: "Create & manage codes",
       Icon: Code2,
-      gradient: "linear-gradient(145deg, #050c20, #000)",
+      gradient: "linear-gradient(145deg, rgba(5,12,32,0.88), rgba(0,0,0,0.78))",
       accent: "#818cf8",
-      iconBg: "rgba(129,140,248,0.14)",
+      iconBg: "rgba(129,140,248,0.16)",
     },
     {
       id: "user-management",
       label: "User Management",
       desc: "View all users",
       Icon: Users,
-      gradient: "linear-gradient(145deg, #051510, #000)",
+      gradient: "linear-gradient(145deg, rgba(5,21,16,0.88), rgba(0,0,0,0.78))",
       accent: "#4ade80",
-      iconBg: "rgba(74,222,128,0.14)",
+      iconBg: "rgba(74,222,128,0.16)",
     },
     {
       id: "bank-approval",
       label: "Bank Approval",
       desc: "Approve accounts",
       Icon: CheckSquare,
-      gradient: "linear-gradient(145deg, #1a1000, #000)",
+      gradient: "linear-gradient(145deg, rgba(26,16,0,0.88), rgba(0,0,0,0.78))",
       accent: "#fb923c",
-      iconBg: "rgba(251,146,60,0.14)",
+      iconBg: "rgba(251,146,60,0.16)",
     },
     {
       id: "change-support",
       label: "Change Support Link",
       desc: "Update Telegram link",
       Icon: Activity,
-      gradient: "linear-gradient(145deg, #0e0520, #000)",
+      gradient: "linear-gradient(145deg, rgba(14,5,32,0.88), rgba(0,0,0,0.78))",
       accent: "#c084fc",
-      iconBg: "rgba(192,132,252,0.14)",
+      iconBg: "rgba(192,132,252,0.16)",
     },
   ];
 
@@ -213,28 +214,34 @@ export default function DashboardHome() {
             data-ocid={`dashboard.${id.replace(/-/g, "_")}.button`}
             className="relative flex flex-col p-4 rounded-2xl text-left transition-all duration-200 active:scale-95 overflow-hidden"
             style={{
-              background: locked ? "#060606" : gradient,
+              background: locked ? "rgba(6,6,6,0.7)" : gradient,
               minHeight: "120px",
-              border: locked ? "1px solid #181818" : `1px solid ${accent}28`,
+              border: locked
+                ? "1px solid rgba(24,24,24,0.6)"
+                : `1px solid ${accent}35`,
               boxShadow: locked
                 ? "none"
-                : `0 2px 20px rgba(0,0,0,0.85), inset 0 1px 0 ${accent}10`,
+                : `0 1px 8px rgba(0,0,0,0.5), inset 0 1px 0 ${accent}08`,
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
               opacity: locked ? 0.4 : 1,
             }}
           >
+            {/* Top accent line */}
             <div
-              className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+              className="absolute top-0 left-0 right-0 h-[1px] rounded-t-2xl"
               style={{
                 background: locked
-                  ? "#181818"
-                  : `linear-gradient(90deg, transparent, ${accent}90, transparent)`,
+                  ? "rgba(24,24,24,0.5)"
+                  : `linear-gradient(90deg, transparent, ${accent}70, transparent)`,
               }}
             />
+            {/* Subtle corner glow */}
             {!locked && (
               <div
-                className="absolute top-0 right-0 w-16 h-16 rounded-full pointer-events-none"
+                className="absolute top-0 right-0 w-14 h-14 rounded-full pointer-events-none"
                 style={{
-                  background: `radial-gradient(circle at top right, ${accent}18, transparent 70%)`,
+                  background: `radial-gradient(circle at top right, ${accent}12, transparent 70%)`,
                 }}
               />
             )}
@@ -275,15 +282,18 @@ export default function DashboardHome() {
         <div
           className="rounded-2xl px-5 py-4 flex items-center gap-4 relative overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, #080f1e, #050c14)",
+            background:
+              "linear-gradient(135deg, rgba(8,15,30,0.92), rgba(5,12,20,0.88))",
             border: "1px solid rgba(0,180,255,0.2)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
           }}
         >
           <div
             className="absolute right-0 top-0 bottom-0 w-32 pointer-events-none"
             style={{
               background:
-                "radial-gradient(ellipse at right center, rgba(0,180,255,0.1), transparent 70%)",
+                "radial-gradient(ellipse at right center, rgba(0,180,255,0.08), transparent 70%)",
             }}
           />
           {/* Bigger logo — fully visible */}

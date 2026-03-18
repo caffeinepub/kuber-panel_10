@@ -1,4 +1,11 @@
-import { Download, FileText, Printer } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileText,
+  Printer,
+} from "lucide-react";
+import { useState } from "react";
 import BankLogo from "../../components/BankLogo";
 import { useApp } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
@@ -27,6 +34,13 @@ function fmtDT(iso: string) {
 
 export default function BankStatement() {
   const { isAdmin } = useApp();
+  const [expandedSessions, setExpandedSessions] = useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleSession = (key: string) => {
+    setExpandedSessions((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Get completed session bank statement entries (saved when fund is turned OFF)
   const stmtHistory = LocalStore.getBankStatementHistory();
@@ -106,7 +120,7 @@ export default function BankStatement() {
         <div>
           <h2 className="text-xl font-bold gold-text">Bank Statement</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Per-session statements — each Fund ON→OFF cycle is a separate block
+            Per-session Bank statements
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -186,22 +200,8 @@ export default function BankStatement() {
                         </div>
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        Holder: {bankInfo.accountHolderName}
+                        A/C: {bankInfo.accountNumber}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        A/C: {bankInfo.accountNumber} &nbsp;|&nbsp; IFSC:{" "}
-                        {bankInfo.ifscCode}
-                      </div>
-                      {bankInfo.mobileNumber && (
-                        <div className="text-xs text-gray-600">
-                          Mobile: {bankInfo.mobileNumber}
-                        </div>
-                      )}
-                      {bankInfo.upiId && (
-                        <div className="text-xs text-gray-600">
-                          UPI: {bankInfo.upiId}
-                        </div>
-                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-gray-500 mb-1">
@@ -220,7 +220,7 @@ export default function BankStatement() {
                   </div>
                 </div>
 
-                {/* Session blocks */}
+                {/* Session blocks — each is a clickable card */}
                 {Object.entries(sessionMap).map(([sid, entries], si) => {
                   const sessionCredit = entries.reduce(
                     (s, e) => s + e.credit,
@@ -230,6 +230,8 @@ export default function BankStatement() {
                   const startTime = entries[0]?.sessionStartTime;
                   const endTime = entries[0]?.sessionEndTime;
                   const fundType = entries[0]?.fundType;
+                  const sessionKey = `${bankId}_${sid}`;
+                  const isExpanded = expandedSessions[sessionKey] ?? false;
 
                   return (
                     <div
@@ -242,15 +244,22 @@ export default function BankStatement() {
                             : "none",
                       }}
                     >
-                      {/* Session header */}
-                      <div
-                        className="px-5 py-3 flex items-center justify-between flex-wrap gap-2"
-                        style={{ background: "rgba(255,255,255,0.025)" }}
+                      {/* Clickable session header card */}
+                      <button
+                        type="button"
+                        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 cursor-pointer transition-colors"
+                        style={{
+                          background: isExpanded
+                            ? "rgba(255,255,255,0.04)"
+                            : "rgba(255,255,255,0.02)",
+                        }}
+                        onClick={() => toggleSession(sessionKey)}
+                        data-ocid={`bank_statement.session_toggle.${si + 1}`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap mb-2">
                             <span
-                              className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full mr-2"
+                              className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
                               style={{
                                 background: "rgba(212,160,23,0.12)",
                                 color: "#d4a017",
@@ -262,32 +271,37 @@ export default function BankStatement() {
                               {entries.length} transactions
                             </span>
                           </div>
+                          <div className="text-xs text-white font-semibold mb-0.5">
+                            {bankInfo.bankName}
+                          </div>
+                          <div className="text-[10px] text-gray-500">
+                            A/C: {bankInfo.accountNumber}
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
+                            {startTime && (
+                              <div>
+                                <div className="text-[9px] text-gray-600 uppercase tracking-wider">
+                                  Fund ON
+                                </div>
+                                <div className="text-[10px] text-green-500 font-semibold">
+                                  {fmtDT(startTime)}
+                                </div>
+                              </div>
+                            )}
+                            {endTime && (
+                              <div>
+                                <div className="text-[9px] text-gray-600 uppercase tracking-wider">
+                                  Fund OFF
+                                </div>
+                                <div className="text-[10px] text-red-400 font-semibold">
+                                  {fmtDT(endTime)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-right">
-                          {startTime && (
-                            <div>
-                              <div className="text-[9px] text-gray-600 uppercase tracking-wider">
-                                Fund ON
-                              </div>
-                              <div className="text-[10px] text-green-500 font-semibold">
-                                {fmtDT(startTime)}
-                              </div>
-                            </div>
-                          )}
-                          {endTime && (
-                            <div>
-                              <div className="text-[9px] text-gray-600 uppercase tracking-wider">
-                                Fund OFF
-                              </div>
-                              <div className="text-[10px] text-red-400 font-semibold">
-                                {fmtDT(endTime)}
-                              </div>
-                            </div>
-                          )}
-                          <div>
-                            <div className="text-[9px] text-gray-600">
-                              Session
-                            </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <div className="text-right">
                             <div className="text-[10px] font-bold">
                               <span className="text-green-400">
                                 +₹{sessionCredit.toLocaleString("en-IN")}
@@ -298,98 +312,108 @@ export default function BankStatement() {
                               </span>
                             </div>
                           </div>
+                          <div style={{ color: "#d4a017" }}>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </button>
 
-                      {/* Transactions table for this session */}
-                      <div className="overflow-x-auto">
-                        <table
-                          className="w-full"
-                          data-ocid={`bank_statement.table.${bi + 1}.${si + 1}`}
-                        >
-                          <thead>
-                            <tr
-                              style={{
-                                borderBottom: "1px solid rgba(212,160,23,0.12)",
-                              }}
-                            >
-                              {[
-                                "Date",
-                                "Time",
-                                "UTR Number",
-                                "Fund",
-                                "Credit (₹)",
-                                "Debit (₹)",
-                              ].map((h) => (
-                                <th
-                                  key={h}
-                                  className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
-                                  style={{
-                                    color: "#d4a017",
-                                    background: "#080808",
-                                  }}
-                                >
-                                  {h}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {entries.map((e, i) => (
+                      {/* Expanded: Transactions table for this session */}
+                      {isExpanded && (
+                        <div className="overflow-x-auto">
+                          <table
+                            className="w-full"
+                            data-ocid={`bank_statement.table.${bi + 1}.${si + 1}`}
+                          >
+                            <thead>
                               <tr
-                                key={e.id}
-                                data-ocid={`bank_statement.item.${i + 1}`}
                                 style={{
                                   borderBottom:
-                                    "1px solid rgba(255,255,255,0.04)",
-                                  background:
-                                    i % 2 === 0 ? "#060606" : "#030303",
+                                    "1px solid rgba(212,160,23,0.12)",
                                 }}
                               >
-                                <td className="px-4 py-2.5 text-xs text-gray-300">
-                                  {e.date}
-                                </td>
-                                <td className="px-4 py-2.5 text-xs text-gray-400">
-                                  {e.time}
-                                </td>
-                                <td className="px-4 py-2.5 text-xs font-mono text-gray-400">
-                                  {e.utrNumber}
-                                </td>
-                                <td className="px-4 py-2.5">
-                                  <span
-                                    className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase gold-text"
+                                {[
+                                  "Date",
+                                  "Time",
+                                  "UTR Number",
+                                  "Fund",
+                                  "Credit (₹)",
+                                  "Debit (₹)",
+                                ].map((h) => (
+                                  <th
+                                    key={h}
+                                    className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
                                     style={{
-                                      background: "rgba(212,160,23,0.1)",
+                                      color: "#d4a017",
+                                      background: "#080808",
                                     }}
                                   >
-                                    {fundLabels[e.fundType] ?? e.fundType}
-                                  </span>
-                                </td>
-                                <td
-                                  className="px-4 py-2.5 text-xs font-bold"
-                                  style={{
-                                    color: e.credit > 0 ? "#4ade80" : "#333",
-                                  }}
-                                >
-                                  {e.credit > 0
-                                    ? `+${e.credit.toLocaleString("en-IN")}`
-                                    : "-"}
-                                </td>
-                                <td
-                                  className="px-4 py-2.5 text-xs font-bold"
-                                  style={{
-                                    color: e.debit > 0 ? "#f87171" : "#333",
-                                  }}
-                                >
-                                  {e.debit > 0
-                                    ? `-${e.debit.toLocaleString("en-IN")}`
-                                    : "-"}
-                                </td>
+                                    {h}
+                                  </th>
+                                ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {entries.map((e, i) => (
+                                <tr
+                                  key={e.id}
+                                  data-ocid={`bank_statement.item.${i + 1}`}
+                                  style={{
+                                    borderBottom:
+                                      "1px solid rgba(255,255,255,0.04)",
+                                    background:
+                                      i % 2 === 0 ? "#060606" : "#030303",
+                                  }}
+                                >
+                                  <td className="px-4 py-2.5 text-xs text-gray-300">
+                                    {e.date}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-xs text-gray-400">
+                                    {e.time}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-xs font-mono text-gray-400">
+                                    {e.utrNumber}
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    <span
+                                      className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase gold-text"
+                                      style={{
+                                        background: "rgba(212,160,23,0.1)",
+                                      }}
+                                    >
+                                      {fundLabels[e.fundType] ?? e.fundType}
+                                    </span>
+                                  </td>
+                                  <td
+                                    className="px-4 py-2.5 text-xs font-bold"
+                                    style={{
+                                      color: e.credit > 0 ? "#4ade80" : "#333",
+                                    }}
+                                  >
+                                    {e.credit > 0
+                                      ? `+${e.credit.toLocaleString("en-IN")}`
+                                      : "-"}
+                                  </td>
+                                  <td
+                                    className="px-4 py-2.5 text-xs font-bold"
+                                    style={{
+                                      color: e.debit > 0 ? "#f87171" : "#333",
+                                    }}
+                                  >
+                                    {e.debit > 0
+                                      ? `-${e.debit.toLocaleString("en-IN")}`
+                                      : "-"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

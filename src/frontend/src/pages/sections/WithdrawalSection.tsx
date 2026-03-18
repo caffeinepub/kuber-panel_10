@@ -189,17 +189,24 @@ export default function WithdrawalSection() {
 
           <div>
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
-              Withdrawal Amount (₹)
+              {method === "usdt" ? "USDT Amount (₮)" : "Withdrawal Amount (₹)"}
             </div>
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
+              placeholder={
+                method === "usdt" ? "Enter USDT amount" : "Enter amount"
+              }
               data-ocid="withdrawal.amount.input"
               className={inputClass}
               style={inputStyle}
             />
+            {method === "usdt" && amount && Number(amount) > 0 && (
+              <div className="mt-1.5 text-xs" style={{ color: "#9ca3af" }}>
+                ≈ INR convert(₹{(Number(amount) * 85).toLocaleString("en-IN")})
+              </div>
+            )}
           </div>
 
           {method === "upi" && (
@@ -328,19 +335,36 @@ export default function WithdrawalSection() {
           )}
 
           {method === "usdt" && (
-            <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
-                USDT Wallet Address
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
+                  Network
+                </div>
+                <div
+                  className="px-3 py-2.5 rounded-lg text-sm font-semibold"
+                  style={{
+                    background: "oklch(0.13 0 0)",
+                    border: "1px solid oklch(0.75 0.15 85 / 20%)",
+                    color: "#22d3ee",
+                  }}
+                >
+                  TRC20 (TRON)
+                </div>
               </div>
-              <input
-                type="text"
-                value={usdtAddress}
-                onChange={(e) => setUsdtAddress(e.target.value)}
-                placeholder="Enter USDT TRC20 address"
-                data-ocid="withdrawal.usdt.input"
-                className={inputClass}
-                style={inputStyle}
-              />
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
+                  USDT Wallet Address
+                </div>
+                <input
+                  type="text"
+                  value={usdtAddress}
+                  onChange={(e) => setUsdtAddress(e.target.value)}
+                  placeholder="Enter USDT TRC20 address"
+                  data-ocid="withdrawal.usdt.input"
+                  className={inputClass}
+                  style={inputStyle}
+                />
+              </div>
             </div>
           )}
 

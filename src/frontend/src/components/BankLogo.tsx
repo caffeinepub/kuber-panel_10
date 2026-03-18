@@ -552,19 +552,25 @@ interface Props {
 
 export default function BankLogo({ bankName, size = 32 }: Props) {
   const theme = getTheme(bankName);
-  const [imgFailed, setImgFailed] = useState(false);
+  const [googleFailed, setGoogleFailed] = useState(false);
+  const [clearbitFailed, setClearbitFailed] = useState(false);
 
   const bgColor = theme?.bg ?? hashColor(bankName).bg;
   const accentColor = theme?.accent ?? hashColor(bankName).accent;
   const initials = theme?.abbr ?? getInitials(bankName);
-
-  // Only try image if we have a known domain
-  const logoUrl =
-    !imgFailed && theme?.domain
-      ? `https://logo.clearbit.com/${theme.domain}`
-      : null;
+  const domain = theme?.domain;
 
   const abbrevFontSize = initials.length <= 3 ? size * 0.32 : size * 0.26;
+
+  // Determine which image source to use
+  const googleUrl = domain
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    : null;
+  const clearbitUrl = domain ? `https://logo.clearbit.com/${domain}` : null;
+
+  const showGoogle = !googleFailed && googleUrl !== null;
+  const showClearbit = googleFailed && !clearbitFailed && clearbitUrl !== null;
+  const showBadge = !showGoogle && !showClearbit;
 
   return (
     <div
@@ -582,18 +588,31 @@ export default function BankLogo({ bankName, size = 32 }: Props) {
         position: "relative",
       }}
     >
-      {logoUrl ? (
+      {showGoogle && (
         <img
-          src={logoUrl}
+          src={googleUrl!}
           alt={bankName}
-          onError={() => setImgFailed(true)}
+          onError={() => setGoogleFailed(true)}
+          style={{
+            width: size * 0.72,
+            height: size * 0.72,
+            objectFit: "contain",
+          }}
+        />
+      )}
+      {showClearbit && (
+        <img
+          src={clearbitUrl!}
+          alt={bankName}
+          onError={() => setClearbitFailed(true)}
           style={{
             width: size * 0.75,
             height: size * 0.75,
             objectFit: "contain",
           }}
         />
-      ) : (
+      )}
+      {showBadge && (
         <>
           {/* Diagonal accent line for official look */}
           <div

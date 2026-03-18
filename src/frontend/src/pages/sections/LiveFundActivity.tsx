@@ -28,6 +28,7 @@ export default function LiveFundActivity() {
   const { bankAccounts, activeFundSessions, isAdmin, liveTxns } = useApp();
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
 
+  // Show ALL approved banks — no arbitrary limit
   const approvedBanks = bankAccounts.filter((b) => b.status === "approved");
   const activeSessions = Object.entries(activeFundSessions);
 
@@ -37,7 +38,7 @@ export default function LiveFundActivity() {
     setShowDetails((prev) => ({ ...prev, [bankId]: !prev[bankId] }));
   };
 
-  // Non-admin: show offline
+  // Non-admin: show clean offline state with no bank detail rows
   if (!isAdmin) {
     return (
       <div className="space-y-6">
@@ -63,28 +64,6 @@ export default function LiveFundActivity() {
             <div className="font-bold text-white mb-1 text-lg">OFFLINE</div>
             <div className="text-xs text-gray-500">
               Live transaction feed is not available.
-            </div>
-          </div>
-          <div
-            className="rounded-xl p-4 w-full mt-2"
-            style={{ background: "#000000", border: "1px solid #1a1a1a" }}
-          >
-            <div className="text-xs text-gray-700 mb-3 font-bold uppercase tracking-widest">
-              Bank Details
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">Bank Name</span>
-                <span className="text-gray-800">---</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">Account No.</span>
-                <span className="text-gray-800">---</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">IFSC Code</span>
-                <span className="text-gray-800">---</span>
-              </div>
             </div>
           </div>
         </div>
@@ -126,10 +105,14 @@ export default function LiveFundActivity() {
       ) : (
         activeSessions.map(([bankId, { fundType }], idx) => {
           const bank = getBankById(bankId);
-          if (!bank) return null;
           const color = fundColors[fundType] ?? "#7c3aed";
           const fundLabel = fundLabels[fundType] ?? fundType;
           const isVisible = showDetails[bankId] ?? false;
+
+          // If bank was deleted, render nothing
+          if (!bank) {
+            return null;
+          }
 
           return (
             <div
@@ -282,7 +265,7 @@ export default function LiveFundActivity() {
               {liveTxns.map((tx, i) => {
                 const isCredit = tx.credit > 0;
                 const amount = isCredit ? tx.credit : tx.debit;
-                const bank = getBankById(tx.bankId);
+                const txBank = getBankById(tx.bankId);
                 const fundBadge =
                   fundBadgeLabels[tx.fundType] ?? tx.fundType.toUpperCase();
 
@@ -339,7 +322,7 @@ export default function LiveFundActivity() {
                     {/* Row 3: Bank name (left) + Time (right) */}
                     <div className="flex items-center justify-between mt-0.5">
                       <span className="text-[12px] text-gray-400">
-                        {bank?.bankName ?? ""}
+                        {txBank?.bankName ?? ""}
                       </span>
                       <span className="text-[12px] text-gray-400">
                         {tx.time}
