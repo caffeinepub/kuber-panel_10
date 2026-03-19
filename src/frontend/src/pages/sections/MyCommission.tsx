@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext";
 import { COMMISSION_RATES } from "../../context/AppContext";
 import * as LocalStore from "../../utils/LocalStore";
 import type { CommissionHistoryEntry } from "../../utils/LocalStore";
+import { fmtTimeUpper } from "../../utils/timeUtils";
 
 const fundColors: Record<string, string> = {
   gaming: "#7c3aed",
@@ -12,6 +13,13 @@ const fundColors: Record<string, string> = {
   mix: "#0d9488",
   political: "#dc2626",
 };
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN");
+}
+function fmtTime(iso: string) {
+  return fmtTimeUpper(new Date(iso));
+}
 
 export default function MyCommission() {
   const { setActiveSection, isAdmin } = useApp();
@@ -23,13 +31,6 @@ export default function MyCommission() {
     LocalStore.getCommissionHistory();
 
   const displayBalance = isAdmin ? adminBalance : 0;
-
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN");
-  const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
 
   return (
     <div className="space-y-6">
@@ -49,7 +50,7 @@ export default function MyCommission() {
               Available Commission Balance
             </div>
             <div className="text-4xl font-black gold-text break-all">
-              ₹
+              \u20b9
               {displayBalance.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
               })}
@@ -116,18 +117,9 @@ export default function MyCommission() {
                 onClick={() => setSelectedEntry(entry)}
               >
                 <div className="flex items-start justify-between gap-2 min-w-0">
-                  {/* Left side: BankLogo + text content */}
                   <div className="flex items-start gap-3 flex-1 min-w-0 overflow-hidden">
                     <BankLogo bankName={entry.bankName} size={32} />
                     <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span
-                          className="text-xs font-black uppercase px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: `${color}18`, color }}
-                        >
-                          {entry.fundLabel} Fund
-                        </span>
-                      </div>
                       <div className="text-sm font-bold text-white mb-0.5 truncate">
                         {entry.bankName}
                       </div>
@@ -135,15 +127,14 @@ export default function MyCommission() {
                         Acc: {entry.accountNumber}
                       </div>
                       <div className="text-[10px] text-gray-600 mt-1 break-all">
-                        {fmtDate(entry.startTime)} {fmtTime(entry.startTime)} →{" "}
-                        {fmtDate(entry.endTime)} {fmtTime(entry.endTime)}
+                        {fmtDate(entry.startTime)} {fmtTime(entry.startTime)}{" "}
+                        \u2192 {fmtDate(entry.endTime)} {fmtTime(entry.endTime)}
                       </div>
                     </div>
                   </div>
-                  {/* Right side amount — fixed width, no overflow */}
                   <div className="text-right flex-shrink-0 max-w-[110px]">
                     <div className="text-lg font-black gold-text break-all">
-                      +₹
+                      +\u20b9
                       {entry.totalCommission.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
@@ -166,7 +157,6 @@ export default function MyCommission() {
           style={{ background: "#000000" }}
           data-ocid="commission.details.modal"
         >
-          {/* Header */}
           <div
             className="px-5 py-4 flex items-center justify-between flex-shrink-0"
             style={{
@@ -189,9 +179,7 @@ export default function MyCommission() {
             </button>
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-            {/* Fund badge */}
             <div className="flex items-center gap-3">
               <span
                 className="text-sm font-black uppercase px-3 py-1 rounded-full"
@@ -205,7 +193,6 @@ export default function MyCommission() {
               </span>
             </div>
 
-            {/* Bank info */}
             <div
               className="rounded-xl p-4"
               style={{ background: "#0d0d0d", border: "1px solid #1a1a1a" }}
@@ -223,7 +210,6 @@ export default function MyCommission() {
               </div>
             </div>
 
-            {/* Total commission */}
             <div
               className="rounded-xl p-5 text-center"
               style={{
@@ -235,7 +221,7 @@ export default function MyCommission() {
                 Total Commission Earned
               </div>
               <div className="text-4xl font-black gold-text">
-                +₹
+                +\u20b9
                 {selectedEntry.totalCommission.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                 })}
@@ -249,8 +235,7 @@ export default function MyCommission() {
               </div>
             </div>
 
-            {/* Time details */}
-            <div className="space-y-2">
+            <div className="space-y-0">
               {[
                 [
                   "Fund ON",
@@ -275,7 +260,6 @@ export default function MyCommission() {
             </div>
           </div>
 
-          {/* Footer */}
           <div
             className="px-5 py-4 flex-shrink-0"
             style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}

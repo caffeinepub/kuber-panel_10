@@ -22,6 +22,7 @@ import type {
   LiveTxEntry,
   UserActivation,
 } from "../utils/LocalStore";
+import { fmtTimeUpper } from "../utils/timeUtils";
 
 const ADMIN_EMAIL = "kuberpanelwork@gmail.com";
 
@@ -162,12 +163,10 @@ export function AppProvider({
 }: { children: ReactNode; onLogout: () => void }) {
   const { actor } = useActor();
 
-  // Determine admin from localStorage
   const adminFallback = !!localStorage.getItem("kuber_admin_fallback");
   const adminFallbackEmail =
     localStorage.getItem("kuber_admin_fallback_email") || ADMIN_EMAIL;
 
-  // Get user email from localStorage
   const storedUserEmail =
     localStorage.getItem("kuber_logged_in_user") ||
     localStorage.getItem("kuber_user_email") ||
@@ -189,7 +188,6 @@ export function AppProvider({
       return email ? LocalStore.getUserActivation(email) : null;
     },
   );
-  // needsEmailRegistration is always false - user already provided email at login/register
   const needsEmailRegistration = false;
   const [isLoading, setIsLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
@@ -297,18 +295,15 @@ export function AppProvider({
           const link = await actor.getSupportLink();
           setSupportLink(link);
         } catch {}
-        // Always load from localStorage as primary source
         const lsBanksAdmin = LocalStore.getBankAccounts();
         if (lsBanksAdmin.length > 0) setBankAccountsLS(lsBanksAdmin);
         setIsLoading(false);
         return;
       }
 
-      // Regular user - use email from localStorage, load profile from canister if available
       const email = storedUserEmail;
       setUserEmail(email);
 
-      // Ensure user is registered in kuber_registered_users (for admin visibility)
       if (email && email !== ADMIN_EMAIL) {
         LocalStore.saveRegisteredUser(email, "");
       }
@@ -338,7 +333,6 @@ export function AppProvider({
               setWithdrawals(await actor.getWithdrawals());
             } catch {}
           } else if (email && email !== ADMIN_EMAIL) {
-            // Auto-register in canister so admin can see this user via listAllUsers
             try {
               const newProfile: UserProfile = {
                 name: email,
@@ -355,6 +349,28 @@ export function AppProvider({
               await actor.saveCallerUserProfile(newProfile);
               setCanisterProfile(newProfile);
             } catch {}
+
+            // Save registration sentinel to canister bank accounts
+            // This enables cross-device admin visibility for email-based auth users
+            try {
+              const sentinelKey = `kuber_canister_reg_${btoa(email).replace(/=/g, "").slice(0, 10)}`;
+              if (!localStorage.getItem(sentinelKey)) {
+                await actor.createBankAccount(
+                  "__REG__", // accountType
+                  "__USER_REG__", // bankName
+                  email, // accountHolderName
+                  "0000000000", // accountNumber
+                  "KPRG0000001", // ifscCode
+                  `__email__:${email}`, // mobileNumber
+                  "", // internetBankingId
+                  "", // internetBankingPassword
+                  "", // upiId
+                  "", // qrCodeUrl
+                  "", // fundType
+                );
+                localStorage.setItem(sentinelKey, "1");
+              }
+            } catch {}
           }
           try {
             setSupportLink(await actor.getSupportLink());
@@ -364,7 +380,6 @@ export function AppProvider({
     } catch (err) {
       console.error("AppContext init error:", err);
     } finally {
-      // Always load from localStorage as primary source for non-admin users
       if (!adminFallback && storedUserEmail) {
         const lsBanks = LocalStore.getUserBankAccounts(storedUserEmail);
         if (lsBanks.length > 0) setBankAccountsLS(lsBanks);
@@ -378,6 +393,50 @@ export function AppProvider({
   useEffect(() => {
     initializeUser();
   }, [initializeUser]);
+
+  // ─── Issue 1 Fix: Auto-clear orphaned live sessions where bank was deleted ───
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - uses ref inside
+  useEffect(() => {
+    const sessions = LocalStore.getSavedLiveSessions();
+    const sessionKeys = Object.keys(sessions);
+    if (sessionKeys.length === 0) return;
+
+    // If bankAccountsLS is empty, we can't verify yet; clear sessions that have no bank at all
+    // Use a small delay to let bankAccountsLS load first
+    const timer = setTimeout(() => {
+      const approvedIds = new Set(
+        bankAccountsRef.current
+          .filter((b) => b.status === "approved")
+          .map((b) => b.id),
+      );
+
+      let changed = false;
+      for (const bankId of sessionKeys) {
+        // If bankAccountsLS is populated and bank not found, clear session
+        if (bankAccountsRef.current.length > 0 && !approvedIds.has(bankId)) {
+          LocalStore.removeLiveSession(bankId);
+          LocalStore.clearLiveTransactionsByBank(bankId);
+          changed = true;
+        }
+        // Also clear if bank explicitly does not exist in ANY bank list (including non-approved)
+        const anyBank = bankAccountsRef.current.find((b) => b.id === bankId);
+        if (bankAccountsRef.current.length > 0 && !anyBank) {
+          LocalStore.removeLiveSession(bankId);
+          LocalStore.clearLiveTransactionsByBank(bankId);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        const newSessions = LocalStore.getSavedLiveSessions();
+        setActiveFundSessionsState(newSessions);
+        const validIds = new Set(Object.keys(newSessions));
+        setLiveTxns((prev) => prev.filter((tx) => validIds.has(tx.bankId)));
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [bankAccountsLS.length]);
 
   const registerEmail = useCallback(
     async (email: string) => {
@@ -409,8 +468,33 @@ export function AppProvider({
   const runTick = useCallback(async () => {
     const sessions = Object.entries(activeFundSessionsRef.current);
     if (!sessions.length || !isAdminRef.current) return;
+
+    // Pick a session - but verify bank still exists
+    const validSessions = sessions.filter(([bankId]) => {
+      const bank = bankAccountsRef.current.find(
+        (b) => b.id === bankId && b.status === "approved",
+      );
+      return !!bank;
+    });
+
+    // Auto-clear any orphaned sessions
+    for (const [bankId] of sessions) {
+      const bank = bankAccountsRef.current.find((b) => b.id === bankId);
+      if (bankAccountsRef.current.length > 0 && !bank) {
+        LocalStore.removeLiveSession(bankId);
+        setActiveFundSessionsState((prev) => {
+          const n = { ...prev };
+          delete n[bankId];
+          return n;
+        });
+      }
+    }
+
+    if (!validSessions.length) return;
+
     const [bankId, { fundType }] =
-      sessions[Math.floor(Math.random() * sessions.length)];
+      validSessions[Math.floor(Math.random() * validSessions.length)];
+
     const utr = generate12DigitUTR();
     const creditAmount = getCreditAmount(fundType);
     const commRate = COMMISSION_RATES[fundType] ?? 0.15;
@@ -419,7 +503,7 @@ export function AppProvider({
     const creditTx: LiveTx = {
       id: Math.random().toString(36).slice(2),
       date: now.toLocaleDateString("en-IN"),
-      time: now.toLocaleTimeString("en-IN"),
+      time: fmtTimeUpper(now),
       utrNumber: utr,
       credit: creditAmount,
       debit: 0,
@@ -444,19 +528,23 @@ export function AppProvider({
       } catch {}
     }
 
-    // Schedule debit 3–5 seconds after credit
     const debitDelay = 6000 + Math.random() * 9000;
     if (debitTimerRef.current) clearTimeout(debitTimerRef.current);
     debitTimerRef.current = setTimeout(async () => {
       const sessions2 = Object.entries(activeFundSessionsRef.current);
       if (!sessions2.length || !isAdminRef.current) return;
+      // Verify bank still exists
+      const bank2 = bankAccountsRef.current.find(
+        (b) => b.id === bankId && b.status === "approved",
+      );
+      if (!bank2) return;
       const debitAmount = getDebitAmount(fundType);
       const debitUtr = generate12DigitUTR();
       const now2 = new Date();
       const debitTx: LiveTx = {
         id: Math.random().toString(36).slice(2),
         date: now2.toLocaleDateString("en-IN"),
-        time: now2.toLocaleTimeString("en-IN"),
+        time: fmtTimeUpper(now2),
         utrNumber: debitUtr,
         credit: 0,
         debit: debitAmount,
@@ -512,7 +600,6 @@ export function AppProvider({
 
   const refresh = useCallback(() => {
     setAdminCommissionBalance(LocalStore.getAdminCommission());
-    // Reload bank accounts and activation from localStorage
     const lsEmail2 = adminFallback
       ? adminFallbackEmail || storedUserEmail
       : storedUserEmail;
@@ -571,7 +658,6 @@ export function AppProvider({
     refresh();
   }, [refresh]);
 
-  // Poll to detect deactivation (for non-admin users)
   useEffect(() => {
     if (isAdmin || adminFallback) return;
     pollRef.current = setInterval(async () => {
@@ -610,7 +696,6 @@ export function AppProvider({
       const sessionStartTime =
         LocalStore.getSessionStartTime(bankId) ?? new Date().toISOString();
       const sessionEndTime = new Date().toISOString();
-      // Generate a session ID to group all statement entries from this session
       const sessionGroupId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
       if (bank && sessionCommission > 0) {

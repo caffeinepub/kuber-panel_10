@@ -17,7 +17,7 @@ interface UserRow {
   registeredAt: string;
   isActive: boolean;
   activatedFunds: string[];
-  activationCodes: string[]; // codes used to activate each fund
+  activationCodes: string[];
   source: string;
 }
 
@@ -68,7 +68,7 @@ export default function UserManagement() {
         { registeredAt: string; source: string }
       >();
 
-      // Source 1: canister listAllUsers (cross-device)
+      // Source 1: canister listAllUsers
       if (actorRef.current) {
         try {
           const canisterUsers = await actorRef.current.listAllUsers();
@@ -90,7 +90,7 @@ export default function UserManagement() {
         } catch {}
       }
 
-      // Source 2: kuber_registered_users (primary registration store)
+      // Source 2: kuber_registered_users
       const registeredUsers = LocalStore.getRegisteredUsers();
       for (const u of registeredUsers) {
         if (u.email && u.email !== ADMIN_EMAIL && !emailMap.has(u.email)) {
@@ -101,7 +101,7 @@ export default function UserManagement() {
         }
       }
 
-      // Source 3: kuber_users (legacy / primary auth store)
+      // Source 3: kuber_users (auth store)
       try {
         const oldUsers: { email: string; password: string }[] = JSON.parse(
           localStorage.getItem("kuber_users") ?? "[]",
@@ -116,7 +116,7 @@ export default function UserManagement() {
         }
       } catch {}
 
-      // Source 4: kuber_user_activations (users who activated via code)
+      // Source 4: kuber_user_activations
       try {
         const activations: Record<string, unknown> = JSON.parse(
           localStorage.getItem("kuber_user_activations") ?? "{}",
@@ -135,7 +135,7 @@ export default function UserManagement() {
         }
       } catch {}
 
-      // Source 5: current session users
+      // Source 5: session users
       const sessionEmails = [
         localStorage.getItem("kuber_logged_in_user"),
         localStorage.getItem("kuber_user_email"),
@@ -149,7 +149,7 @@ export default function UserManagement() {
         }
       }
 
-      // Source 6: kuber_bank_accounts - get users who submitted banks
+      // Source 6: kuber_bank_accounts
       try {
         const banks = LocalStore.getBankAccounts();
         for (const b of banks) {
@@ -166,7 +166,7 @@ export default function UserManagement() {
         }
       } catch {}
 
-      // Source 7: activation codes - find emails from usedByEmail
+      // Source 7: activation codes usedByEmail
       try {
         const allCodes: ActivationCodeLS[] = LocalStore.getActivationCodes();
         for (const c of allCodes) {
@@ -183,13 +183,17 @@ export default function UserManagement() {
         }
       } catch {}
 
-      // Source 8: canister bank accounts - cross-device user discovery
-      // When users add banks from other devices, their email may be embedded
+      // Source 8: withdrawal history - extract user emails
+      try {
+        // withdrawal history doesn't store emails directly - skip
+      } catch {}
+
+      // Source 9: canister bank accounts (cross-device)
       if (actorRef.current) {
         try {
           const canisterBanks = await actorRef.current.getAllBankAccounts();
           for (const b of canisterBanks) {
-            // Check registration sentinel records
+            // Registration sentinel records
             if (b.bankName === "__USER_REG__" || b.accountType === "__REG__") {
               const email = b.accountHolderName;
               if (
@@ -207,7 +211,7 @@ export default function UserManagement() {
                 });
               }
             }
-            // Also check mobileNumber field for email encoding
+            // Email encoded in mobileNumber field
             if (b.mobileNumber?.startsWith("__email__:")) {
               const email = b.mobileNumber.replace("__email__:", "");
               if (
@@ -225,8 +229,7 @@ export default function UserManagement() {
                 });
               }
             }
-            // Also collect any bank submission - account holder might hint at user
-            // Save canister bank to localStorage for cross-device admin visibility
+            // Save new canister banks to localStorage
             if (b.bankName !== "__USER_REG__" && b.accountType !== "__REG__") {
               const existing = LocalStore.getBankAccounts();
               const existingIds = new Set(existing.map((x) => x.id));
@@ -261,13 +264,26 @@ export default function UserManagement() {
                     : new Date().toISOString(),
                 };
                 LocalStore.saveBankAccounts([mapped, ...existing]);
+                // Extract userId as registered user
+                if (
+                  mapped.userId?.includes("@") &&
+                  mapped.userId !== ADMIN_EMAIL &&
+                  !emailMap.has(mapped.userId)
+                ) {
+                  emailMap.set(mapped.userId, {
+                    registeredAt: mapped.createdAt,
+                    source: "canister_bank_user",
+                  });
+                  // Also ensure they appear in registered users list
+                  LocalStore.saveRegisteredUser(mapped.userId, "");
+                }
               }
             }
           }
         } catch {}
       }
 
-      // Build activation code map: email -> list of codes used
+      // Build activation code map
       const codesByEmail = new Map<string, string[]>();
       try {
         const allCodes: ActivationCodeLS[] = LocalStore.getActivationCodes();
@@ -285,13 +301,10 @@ export default function UserManagement() {
           const act = LocalStore.getUserActivation(email);
           const isActive =
             act?.isActive === true && (act.activatedFunds?.length ?? 0) > 0;
-          // Codes from activation record
           const codesFromActivation = act?.fundCodes
             ? Object.values(act.fundCodes).filter((v) => v && v.length > 0)
             : [];
-          // Codes from code records
           const codesFromCodeList = codesByEmail.get(email) ?? [];
-          // Merge unique codes
           const allUsedCodes = Array.from(
             new Set([...codesFromActivation, ...codesFromCodeList]),
           );
@@ -324,7 +337,6 @@ export default function UserManagement() {
     loadUsers();
   }, [loadUsers]);
 
-  // Auto-refresh every 5 seconds to catch new registrations and code activations
   useEffect(() => {
     const interval = setInterval(loadUsers, 3000);
     return () => clearInterval(interval);
@@ -498,7 +510,7 @@ export default function UserManagement() {
             No {tab === "all" ? "" : tab} users found.
             {tab === "all" && (
               <p className="text-xs text-gray-700 mt-2">
-                Users will appear here after registration.
+                Users will appear here after registration. Click refresh.
               </p>
             )}
           </div>

@@ -16,19 +16,19 @@ const bankModes: {
   {
     key: "IMPS",
     label: "IMPS",
-    limit: "Max ₹2,00,000/day",
+    limit: "Max \u20b92,00,000/day",
     desc: "Instant Transfer",
   },
   {
     key: "NEFT",
     label: "NEFT",
-    limit: "Max ₹10,00,000/day",
+    limit: "Max \u20b910,00,000/day",
     desc: "2 Hours Settlement",
   },
   {
     key: "RTGS",
     label: "RTGS",
-    limit: "Min ₹2L | Max ₹2Cr/day",
+    limit: "Min \u20b92L | Max \u20b92Cr/day",
     desc: "Same Day Settlement",
   },
 ];
@@ -58,7 +58,7 @@ export default function WithdrawalSection() {
     const currentBalance = isAdmin ? LocalStore.getAdminCommission() : 0;
     if (amt > currentBalance) {
       toast.error(
-        `Insufficient balance. Available: ₹${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        `Insufficient balance. Available: \u20b9${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
       );
       return;
     }
@@ -95,7 +95,6 @@ export default function WithdrawalSection() {
       if (isAdmin) {
         LocalStore.deductAdminCommission(amt);
       }
-      // Save to localStorage for persistence
       const newWithdrawal = {
         id: `wd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         amount: amt,
@@ -130,6 +129,9 @@ export default function WithdrawalSection() {
     border: "1px solid oklch(0.75 0.15 85 / 20%)",
   };
 
+  const usdtAmt = Number(amount);
+  const inrEquiv = usdtAmt > 0 ? (usdtAmt * 85).toLocaleString("en-IN") : "";
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold gold-text">Withdrawal</h2>
@@ -140,7 +142,7 @@ export default function WithdrawalSection() {
             Available Commission Balance
           </div>
           <div className="text-3xl font-black gold-text">
-            ₹
+            \u20b9
             {displayBalance.toLocaleString("en-IN", {
               minimumFractionDigits: 2,
             })}
@@ -189,7 +191,7 @@ export default function WithdrawalSection() {
 
           <div>
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
-              {method === "usdt" ? "USDT Amount (₮)" : "Withdrawal Amount (₹)"}
+              {method === "usdt" ? "USDT Amount" : "Withdrawal Amount (\u20b9)"}
             </div>
             <input
               type="number"
@@ -202,9 +204,9 @@ export default function WithdrawalSection() {
               className={inputClass}
               style={inputStyle}
             />
-            {method === "usdt" && amount && Number(amount) > 0 && (
+            {method === "usdt" && usdtAmt > 0 && (
               <div className="mt-1.5 text-xs" style={{ color: "#9ca3af" }}>
-                ≈ INR convert(₹{(Number(amount) * 85).toLocaleString("en-IN")})
+                \u2248 \u20b9{inrEquiv}
               </div>
             )}
           </div>
@@ -348,22 +350,34 @@ export default function WithdrawalSection() {
                     color: "#22d3ee",
                   }}
                 >
-                  TRC20 (TRON)
+                  TRON (TRC20)
                 </div>
               </div>
               <div>
                 <div className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">
                   USDT Wallet Address
+                  <span
+                    className="ml-2 text-[10px] font-normal"
+                    style={{ color: "#6b7280" }}
+                  >
+                    (On-chain)
+                  </span>
                 </div>
                 <input
                   type="text"
                   value={usdtAddress}
                   onChange={(e) => setUsdtAddress(e.target.value)}
-                  placeholder="Enter USDT TRC20 address"
+                  placeholder="Enter USDT TRON (TRC20) address"
                   data-ocid="withdrawal.usdt.input"
                   className={inputClass}
                   style={inputStyle}
                 />
+                <div
+                  className="mt-1.5 text-[10px]"
+                  style={{ color: "#4b5563" }}
+                >
+                  Any on-chain USDT transfer supported (TRC20)
+                </div>
               </div>
             </div>
           )}
